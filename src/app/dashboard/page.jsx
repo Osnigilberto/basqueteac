@@ -326,7 +326,7 @@
         <div className={styles.content}>
             <section className={styles.greeting}>
             <h1>Olá, {firstName}</h1>
-            <p>Pronto pra próximo jogo?</p>
+            <p>Seja bem-vindo, pronto para jogar?</p>
             </section>
 
             <section className={styles.nextGame}>

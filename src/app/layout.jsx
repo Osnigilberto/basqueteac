@@ -1,5 +1,6 @@
   import { Inter } from 'next/font/google'
   import './globals.css'
+  import ServiceWorkerRegister from '@/components/ServiceWorkerRegister'
 
   const inter = Inter({
     subsets: ['latin'],
@@ -9,6 +10,7 @@
   export const metadata = {
     title: 'BasqueteAC',
     description: 'Estatísticas de basquete, sem complicação — pontos, rebotes, assistências, tocos e roubos, em tempo real.',
+    manifest: '/site.webmanifest',
     icons: {
       icon: [
         { url: '/favicon-16x16.png', sizes: '16x16', type: 'image/png' },
@@ -18,13 +20,26 @@
       ],
       apple: '/apple-touch-icon.png',
     },
-    manifest: '/site.webmanifest',
+    appleWebApp: {
+      capable: true,
+      statusBarStyle: 'black-translucent',
+      title: 'BasqueteAC',
+    },
+  }
+
+  export const viewport = {
+    themeColor: '#F4541B',
+    width: 'device-width',
+    initialScale: 1,
   }
 
   export default function RootLayout({ children }) {
     return (
       <html lang="pt-BR" data-theme="dark">
-        <body className={inter.variable}>{children}</body>
+        <body className={inter.variable}>
+          {children}
+          <ServiceWorkerRegister />
+        </body>
       </html>
     )
   }
