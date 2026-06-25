@@ -13,8 +13,9 @@
     where,
   } from 'firebase/firestore'
   import Image from 'next/image'
-  import { BarChart3, Timer, UserRound, CalendarDays, MapPin } from 'lucide-react'
+  import { BarChart3, Timer, UserRound, CalendarDays, MapPin, Download  } from 'lucide-react'
   import { auth, googleProvider, db } from '@/lib/firebase'
+  import { useInstallPrompt } from '@/hooks/useInstallPrompt'
   import styles from './page.module.css'
 
   function formatGameDate(timestamp) {
@@ -28,6 +29,7 @@
     const router = useRouter()
     const [highlightGame, setHighlightGame] = useState(null)
     const [loadingGame, setLoadingGame] = useState(true)
+    const { canInstall, promptInstall } = useInstallPrompt()
 
     const handleGoogleLogin = async () => {
       try {
@@ -110,6 +112,13 @@
               <GoogleIcon />
               Entrar com Google
             </button>
+
+            {canInstall && (
+              <button className={styles.installButton} onClick={promptInstall}>
+                <Download size={16} />
+                Instalar app no dispositivo
+              </button>
+            )}
           </div>
 
           <div className={styles.statCard} aria-hidden="true">
