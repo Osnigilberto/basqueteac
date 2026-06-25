@@ -1,0 +1,222 @@
+    .overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: flex-end;
+    z-index: var(--z-modal-backdrop);
+    }
+
+    .modal {
+    position: relative;
+    width: 100%;
+    max-height: 85vh;
+    overflow-y: auto;
+    background: var(--color-surface);
+    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+    padding: var(--spacing-lg);
+    animation: modalUp 0.2s ease-out;
+    }
+
+    @keyframes modalUp {
+    from { transform: translateY(100%); }
+    to { transform: translateY(0); }
+    }
+
+    .closeButton {
+    position: absolute;
+    top: var(--spacing-md);
+    right: var(--spacing-md);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    background: var(--color-bg-secondary);
+    border: none;
+    border-radius: 50%;
+    color: var(--color-text);
+    }
+
+    .emptyText {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+    }
+
+    .profileRow {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+    margin-bottom: var(--spacing-lg);
+    padding-right: 40px;
+    }
+
+    .avatar {
+    border-radius: 50%;
+    border: 1px solid var(--color-border);
+    }
+
+    .profileInfo {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+    }
+
+    .title {
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-extrabold);
+    letter-spacing: -0.01em;
+    color: var(--color-text);
+    }
+
+    .city {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+    }
+
+    .positions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-xs);
+    }
+
+    .positionPill {
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-semibold);
+    padding: 2px var(--spacing-sm);
+    border-radius: var(--radius-full);
+    border: 1px solid var(--color-border);
+    color: var(--color-text-secondary);
+    }
+
+    .listHeader {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-bold);
+    letter-spacing: 0.08em;
+    color: var(--color-text-tertiary);
+    margin-bottom: var(--spacing-md);
+    }
+
+    .statsGamesPlayed {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+    margin-bottom: var(--spacing-md);
+    }
+
+    .statsGrid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--spacing-md);
+    }
+
+    @media (min-width: 420px) {
+    .statsGrid {
+        grid-template-columns: repeat(6, 1fr);
+    }
+    }
+
+    .statsItem {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--spacing-xs);
+    }
+
+    .statsValue {
+    font-size: var(--font-size-xl);
+    font-weight: var(--font-weight-extrabold);
+    color: var(--color-primary);
+    line-height: 1;
+    }
+
+    .statsLabel {
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text-tertiary);
+    }
+
+    .statsPositive {
+    color: var(--color-success) !important;
+    }
+
+    .statsNegative {
+    color: var(--color-danger) !important;
+    }
+
+    .gameLog {
+    display: flex;
+    flex-direction: column;
+    margin-top: var(--spacing-lg);
+    padding-top: var(--spacing-lg);
+    border-top: 1px solid var(--color-border);
+    }
+
+    .gameLogRow {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-sm) 0;
+    border-top: 1px solid var(--color-border);
+    }
+
+    .gameLogRow:first-child {
+    border-top: none;
+    padding-top: 0;
+    }
+
+    .gameLogInfo {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    }
+
+    .gameLogDate {
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text-tertiary);
+    }
+
+    .gameLogOpponent {
+    font-size: var(--font-size-sm);
+    color: var(--color-text);
+    }
+
+    .gameLogStats {
+    display: flex;
+    gap: var(--spacing-md);
+    overflow-x: auto;
+    padding-bottom: 2px;
+    }
+
+    .gameLogStats span {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-bold);
+    color: var(--color-text);
+    flex-shrink: 0;
+    min-width: 32px;
+    }
+
+    .gameLogStats small {
+    font-size: 10px;
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text-tertiary);
+    }
+
+    @media (min-width: 768px) {
+    .overlay {
+        align-items: center;
+        justify-content: center;
+    }
+
+    .modal {
+        max-width: 480px;
+        border-radius: var(--radius-xl);
+    }
+    }

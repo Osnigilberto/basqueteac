@@ -1,0 +1,343 @@
+    .page {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    padding-bottom: 80px;
+    }
+
+    .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--spacing-md) var(--spacing-lg);
+    border-bottom: 1px solid var(--color-border);
+    }
+
+    .logo {
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-extrabold);
+    letter-spacing: -0.01em;
+    color: var(--color-text);
+    }
+
+    .logoAccent {
+    color: var(--color-primary);
+    }
+
+    .userMenu {
+    position: relative;
+    }
+
+    .userMenuTrigger {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    padding: var(--spacing-xs);
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: var(--radius-md);
+    }
+
+    .userMenuTrigger:hover {
+    background: var(--color-surface);
+    border-color: var(--color-border);
+    }
+
+    .avatar {
+    border-radius: 50%;
+    border: 1px solid var(--color-border);
+    }
+
+    .chevron {
+    color: var(--color-text-tertiary);
+    transition: transform var(--transition-fast);
+    }
+
+    .dropdown {
+    position: absolute;
+    top: calc(100% + var(--spacing-sm));
+    right: 0;
+    min-width: 220px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-lg);
+    padding: var(--spacing-sm);
+    z-index: var(--z-dropdown);
+    }
+
+    .dropdownHeader {
+    display: flex;
+    flex-direction: column;
+    padding: var(--spacing-sm) var(--spacing-md);
+    }
+
+    .dropdownName {
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text);
+    }
+
+    .dropdownEmail {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-tertiary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    }
+
+    .dropdownDivider {
+    height: 1px;
+    background: var(--color-border);
+    margin: var(--spacing-xs) 0;
+    }
+
+    .dropdownItem,
+    .dropdownItemDanger {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    width: 100%;
+    padding: var(--spacing-sm) var(--spacing-md);
+    background: transparent;
+    border: none;
+    border-radius: var(--radius-md);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+    color: var(--color-text);
+    text-align: left;
+    }
+
+    .dropdownItem:hover {
+    background: var(--color-bg-secondary);
+    }
+
+    .dropdownItemDanger {
+    color: var(--color-danger);
+    }
+
+    .dropdownItemDanger:hover {
+    background: var(--color-danger-light);
+    }
+
+    .content {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-lg);
+    padding: var(--spacing-lg);
+    width: 100%;
+    }
+
+    .greeting h1 {
+    font-size: var(--font-size-2xl);
+    font-weight: var(--font-weight-extrabold);
+    letter-spacing: -0.02em;
+    color: var(--color-text);
+    }
+
+    .greeting p {
+    font-size: var(--font-size-base);
+    color: var(--color-text-secondary);
+    margin-top: var(--spacing-xs);
+    }
+
+    .nextGame {
+    padding: var(--spacing-lg);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-xl);
+    }
+
+    .nextGameHeader {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-bold);
+    letter-spacing: 0.08em;
+    color: var(--color-text-tertiary);
+    margin-bottom: var(--spacing-md);
+    }
+
+    .liveDot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--color-success);
+    animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(48, 209, 88, 0.5); }
+    70% { box-shadow: 0 0 0 6px rgba(48, 209, 88, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(48, 209, 88, 0); }
+    }
+
+    .emptyText {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+    }
+
+    .nextGameDate {
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text);
+    text-transform: capitalize;
+    }
+
+    .nextGameLocation {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+    margin-top: var(--spacing-xs);
+    }
+
+    .nextGameTeams {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-sm);
+    margin-top: var(--spacing-md);
+    }
+
+    .teamPillA,
+    .teamPillB {
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-semibold);
+    padding: var(--spacing-xs) var(--spacing-sm);
+    border-radius: var(--radius-full);
+    border: 1px solid var(--color-border);
+    }
+
+    .teamPillA {
+    color: var(--color-text);
+    }
+
+    .teamPillB {
+    color: var(--color-primary);
+    border-color: var(--color-primary);
+    }
+
+    .viewGameButton {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    margin-top: var(--spacing-md);
+    padding-top: var(--spacing-md);
+    border: none;
+    border-top: 1px solid var(--color-border);
+    background: transparent;
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-primary);
+    min-height: 40px;
+    }
+
+    /* ===== RANKING DO GRUPO ===== */
+    .rankingCard {
+    padding: var(--spacing-lg);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-xl);
+    }
+
+    .rankingGrid {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-lg);
+    }
+
+    .rankingCategory {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+    }
+
+    .rankingCategoryLabel {
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-bold);
+    letter-spacing: 0.06em;
+    color: var(--color-text-tertiary);
+    }
+
+    .rankingEmpty {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+    }
+
+    .rankingRow {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-xs) 0;
+    }
+
+    .rankingPosition {
+    width: 18px;
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-bold);
+    color: var(--color-text-tertiary);
+    text-align: center;
+    flex-shrink: 0;
+    }
+
+    .rankingFirst {
+    color: var(--color-primary);
+    }
+
+    .rankingAvatar {
+    border-radius: 50%;
+    flex-shrink: 0;
+    }
+
+    .rankingName {
+    flex: 1;
+    font-size: var(--font-size-sm);
+    color: var(--color-text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    }
+
+    .rankingValue {
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-bold);
+    color: var(--color-text);
+    flex-shrink: 0;
+    }
+
+    @media (min-width: 768px) {
+    .header {
+        padding: var(--spacing-lg) var(--spacing-2xl);
+    }
+
+    .content {
+        max-width: 640px;
+        margin: 0 auto;
+        padding: var(--spacing-2xl);
+    }
+    }
+
+    .rankingRow {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-xs) 0;
+    width: 100%;
+    background: transparent;
+    border: none;
+    text-align: left;
+    }
+
+    .overdueBadge {
+    display: inline-block;
+    margin-left: var(--spacing-sm);
+    padding: 2px var(--spacing-sm);
+    background: var(--color-danger-light);
+    color: var(--color-danger);
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-semibold);
+    border-radius: var(--radius-full);
+    }
