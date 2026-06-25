@@ -35,7 +35,23 @@
 
   export default function RootLayout({ children }) {
     return (
-      <html lang="pt-BR" data-theme="dark">
+      <html lang="pt-BR">
+        <head>
+          {/* Aplica o tema salvo ANTES da página pintar, evitando o "flash"
+              de aparecer um tema errado por um instante ao carregar */}
+          <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){
+              try {
+                var stored = localStorage.getItem('basqueteac-theme');
+                var systemPrefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+                var theme = stored || (systemPrefersDark ? 'dark' : 'light');
+                document.documentElement.setAttribute('data-theme', theme);
+              } catch (e) {}
+            })();`,
+          }}
+        />
+        </head>
         <body className={inter.variable}>
           {children}
           <ServiceWorkerRegister />

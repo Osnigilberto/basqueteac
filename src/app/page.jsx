@@ -12,6 +12,7 @@
     Timestamp,
     where,
   } from 'firebase/firestore'
+  import Image from 'next/image'
   import { BarChart3, Timer, UserRound, CalendarDays, MapPin } from 'lucide-react'
   import { auth, googleProvider, db } from '@/lib/firebase'
   import styles from './page.module.css'
@@ -82,6 +83,7 @@
       <main className={styles.page}>
         <header className={styles.header}>
           <div className={styles.logo}>
+            <Image src="/icon.png" alt="" width={28} height={28} className={styles.logoIcon} />
             Basquete<span className={styles.logoAccent}>AC</span>
           </div>
           <button className={styles.headerLogin} onClick={handleGoogleLogin}>
@@ -95,12 +97,14 @@
               <span className={styles.liveDot} />
               Todos os jogos, em tempo real
             </div>
-            <h1 className={styles.title}>
-              Basquete<span className={styles.titleAccent}>AC</span>
-            </h1>
+            <div className={styles.titleRow}>
+              <Image src="/icon.png" alt="" width={64} height={64} className={styles.titleCrest} />
+              <h1 className={styles.title}>
+                Basquete<span className={styles.titleAccent}>AC</span>
+              </h1>
+            </div>
             <p className={styles.subtitle}>
-              Cada ponto, cada roubo de bola, cada toco. A estatística da nossa
-              pelada, registrada em tempo real, direto da quadra.
+              Cada ponto, cada roubo de bola, cada toco. Tudo registrado, em tempo real, para você acompanhar e analisar depois.
             </p>
             <button className={styles.loginButton} onClick={handleGoogleLogin}>
               <GoogleIcon />
