@@ -1,5 +1,3 @@
-    //src/app/game/[id]/page.jsx
-    
     'use client'
 
     import { useEffect, useRef, useState } from 'react'
@@ -15,7 +13,19 @@
     increment,
     serverTimestamp,
     } from 'firebase/firestore'
-    import { ArrowLeft, MapPin, CalendarDays, Play, Square, RotateCcw, X } from 'lucide-react'
+    import {
+    ArrowLeft,
+    MapPin,
+    CalendarDays,
+    Play,
+    Square,
+    RotateCcw,
+    X,
+    Target,
+    Pencil,
+    Share2,
+    Check,
+    } from 'lucide-react'
     import { db } from '@/lib/firebase'
     import { useAuth } from '@/hooks/useAuth'
     import styles from './page.module.css'
@@ -25,6 +35,8 @@
     live: 'Em andamento',
     finished: 'Finalizado',
     }
+
+    const TARGET_PRESETS = [10, 15, 21, 30]
 
     // Estatísticas além de pontos — todas incrementam de 1 em 1
     const STAT_FIELDS = [
@@ -41,6 +53,22 @@
     return `${dateStr} · ${timeStr}`
     }
 
+    // MVP = maior soma de pontos+rebotes+assistências+tocos+roubos na partida.
+    // Só calcula em jogos finalizados — antes disso não faz sentido eleger MVP.
+    function calculateMvp(game, statsList) {
+    if (game.status !== 'finished' || statsList.length === 0) return null
+
+    const withTotal = statsList.map((s) => ({
+        ...s,
+        total: (s.points || 0) + (s.rebounds || 0) + (s.assists || 0) + (s.blocks || 0) + (s.steals || 0),
+    }))
+
+    const maxTotal = Math.max(...withTotal.map((s) => s.total))
+    if (maxTotal === 0) return null
+
+    return { winners: withTotal.filter((s) => s.total === maxTotal), total: maxTotal }
+    }
+
     export default function GamePage() {
     const { id: gameId } = useParams()
     const router = useRouter()
@@ -50,6 +78,7 @@
     const [loadingGame, setLoadingGame] = useState(true)
     const [stats, setStats] = useState([])
     const [playersMap, setPlayersMap] = useState({})
+    const [copied, setCopied] = useState(false)
 
     // uid do jogador selecionado pra abrir a gaveta de lançar estatística
     const [selectedUid, setSelectedUid] = useState(null)
@@ -64,10 +93,9 @@
     const buzzerAudioRef = useRef(null)
     const whistleAudioRef = useRef(null)
 
-    // Protege a rota
-    useEffect(() => {
-        if (!loading && !user) router.push('/')
-    }, [loading, user, router])
+    // Edição do alvo de pontos — pode mudar a qualquer momento, mesmo com o jogo já rolando
+    const [editingTarget, setEditingTarget] = useState(false)
+    const [customTargetInput, setCustomTargetInput] = useState('')
 
     // Pré-carrega os sons (buzzer e apito) assim que a página abre
     useEffect(() => {
@@ -92,7 +120,8 @@
         audio.play().catch((error) => console.error('[playWhistle]', error))
     }
 
-    // Escuta o documento do jogo em tempo real (placar, status)
+    // Escuta o documento do jogo em tempo real (placar, status) — esta página
+    // é pública: funciona com ou sem login, é só a edição que fica restrita
     useEffect(() => {
         if (!gameId) return
         const unsub = onSnapshot(doc(db, 'games', gameId), (snap) => {
@@ -154,7 +183,6 @@
         return () => clearInterval(intervalRef.current)
     }, [timerRunning])
 
-
     function startTimer() {
         if (timeLeft === 0) setTimeLeft(timerDuration)
         buzzedRef.current = false
@@ -179,11 +207,11 @@
     }
 
     function commitCustomDuration() {
-    const value = parseInt(customInput, 10)
-    if (value > 0 && value <= 60) {
+        const value = parseInt(customInput, 10)
+        if (value > 0 && value <= 60) {
         changeDuration(value)
-    }
-    setCustomInput('')
+        }
+        setCustomInput('')
     }
 
     // Marca pontos: atualiza o placar do time E o total do jogador juntos,
@@ -194,9 +222,15 @@
         [`team${team}.score`]: increment(value),
         updatedAt: serverTimestamp(),
         })
-        batch.update(doc(db, 'games', gameId, 'stats', uid), {
-        points: increment(value),
-        })
+
+        const statsUpdate = { points: increment(value) }
+        // Cesta de 3: além do ponto, conta separadamente quantas cestas de
+        // três foram convertidas — usado pras medalhas de "Bombardeiro"
+        if (value === 3) {
+        statsUpdate.threePointers = increment(1)
+        }
+
+        batch.update(doc(db, 'games', gameId, 'stats', uid), statsUpdate)
         await batch.commit()
     }
 
@@ -216,6 +250,29 @@
         await updateDoc(doc(db, 'games', gameId), { status: 'finished', updatedAt: serverTimestamp() })
     }
 
+    // Atualiza o alvo de pontos a qualquer momento (null = sem limite)
+    async function updateTargetScore(value) {
+        await updateDoc(doc(db, 'games', gameId), { targetScore: value, updatedAt: serverTimestamp() })
+        setEditingTarget(false)
+        setCustomTargetInput('')
+    }
+
+    // Compartilha o link da partida (nativo no celular, copia o link no desktop)
+    async function handleShare() {
+        const url = window.location.href
+        if (navigator.share) {
+        try {
+            await navigator.share({ title: 'BasqueteAC', text: 'Confere o jogo:', url })
+        } catch {
+            // Pessoa cancelou o compartilhamento — não é erro de verdade
+        }
+        } else {
+        await navigator.clipboard.writeText(url)
+        setCopied(true)
+        setTimeout(() => setCopied(false), 2000)
+        }
+    }
+
     // Junta estatística + dados do jogador, por time, ordenado por pontos
     function getTeamRows(team) {
         return stats
@@ -224,7 +281,7 @@
         .sort((a, b) => b.points - a.points)
     }
 
-    if (loading || !user || loadingGame) return null
+    if (loading || loadingGame) return null
 
     if (!game) {
         return (
@@ -239,15 +296,32 @@
     const selectedStat = stats.find((s) => s.uid === selectedUid)
     const selectedPlayer = selectedUid ? playersMap[selectedUid] : null
 
+    const targetScore = game.targetScore ?? null
+    const targetReachedTeam = targetScore
+        ? game.teamA.score >= targetScore
+        ? game.teamA.name
+        : game.teamB.score >= targetScore
+        ? game.teamB.name
+        : null
+        : null
+
+    const mvp = calculateMvp(game, stats)
+
     return (
         <main className={styles.page}>
         <header className={styles.header}>
-            <button className={styles.backButton} onClick={() => router.push('/dashboard')}>
+            <button
+            className={styles.backButton}
+            onClick={() => (user ? router.back() : router.push('/'))}
+            >
             <ArrowLeft size={18} />
             </button>
             <span className={`${styles.statusBadge} ${styles[`status${game.status}`]}`}>
             {STATUS_LABELS[game.status]}
             </span>
+            <button className={styles.shareButton} onClick={handleShare} aria-label="Compartilhar jogo">
+            {copied ? <Check size={18} /> : <Share2 size={18} />}
+            </button>
         </header>
 
         <section className={styles.scoreBanner}>
@@ -262,6 +336,22 @@
             </div>
         </section>
 
+        {targetReachedTeam && (
+            <p className={styles.targetReached}>
+            🏆 {targetReachedTeam} atingiu {targetScore} pontos!
+            </p>
+        )}
+
+        {mvp && (
+            <p className={styles.mvpBanner}>
+            🏅 MVP da partida:{' '}
+            {mvp.winners
+                .map((w) => playersMap[w.uid]?.nickname || playersMap[w.uid]?.name || 'Jogador')
+                .join(' e ')}{' '}
+            ({mvp.total} na soma geral)
+            </p>
+        )}
+
         <p className={styles.gameInfo}>
             <CalendarDays size={14} /> {formatGameDate(game.date)}
         </p>
@@ -269,14 +359,65 @@
             <MapPin size={14} /> {game.location}
         </p>
 
-        {isScheduled && (
+        <div className={styles.targetRow}>
+            {!user ? (
+            <span className={styles.targetDisplay}>
+                <Target size={14} />
+                {targetScore ? `Alvo: ${targetScore} pontos` : 'Sem limite de pontos'}
+            </span>
+            ) : !editingTarget ? (
+            <button className={styles.targetDisplay} onClick={() => setEditingTarget(true)}>
+                <Target size={14} />
+                {targetScore ? `Alvo: ${targetScore} pontos` : 'Sem limite de pontos'}
+                <Pencil size={12} />
+            </button>
+            ) : (
+            <div className={styles.targetEditor}>
+                {TARGET_PRESETS.map((value) => (
+                <button key={value} className={styles.targetButton} onClick={() => updateTargetScore(value)}>
+                    {value}
+                </button>
+                ))}
+                <button className={styles.targetButton} onClick={() => updateTargetScore(null)}>
+                Livre
+                </button>
+                <input
+                type="number"
+                min={1}
+                className={styles.targetInput}
+                placeholder="Outro"
+                value={customTargetInput}
+                onChange={(e) => setCustomTargetInput(e.target.value)}
+                onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                    e.preventDefault()
+                    const value = parseInt(customTargetInput, 10)
+                    if (value > 0) updateTargetScore(value)
+                    }
+                }}
+                />
+                <button
+                type="button"
+                className={styles.targetCancel}
+                onClick={() => {
+                    setEditingTarget(false)
+                    setCustomTargetInput('')
+                }}
+                >
+                <X size={14} />
+                </button>
+            </div>
+            )}
+        </div>
+
+        {isScheduled && user && (
             <button className={styles.startButton} onClick={startGame}>
             <Play size={16} />
             Iniciar jogo
             </button>
         )}
 
-        {isLive && (
+        {isLive && user && (
             <>
             <div className={styles.timerCard}>
                 <div className={styles.timerDurations}>
@@ -312,7 +453,13 @@
                 </span>
 
                 <p className={styles.timerStatus}>
-                {timerRunning ? 'Contando...' : timeLeft === 0 ? 'Zerou' : timeLeft === timerDuration ? 'Pronto' : 'Pausado — bola fora ou falta'}
+                {timerRunning
+                    ? 'Contando...'
+                    : timeLeft === 0
+                    ? 'Zerou'
+                    : timeLeft === timerDuration
+                    ? 'Pronto'
+                    : 'Pausado — bola fora ou falta'}
                 </p>
 
                 <div className={styles.timerControls}>
@@ -343,7 +490,7 @@
         <TeamSection
             title={game.teamA.name}
             rows={getTeamRows('A')}
-            editable={isLive}
+            editable={isLive && !!user}
             onSelect={setSelectedUid}
             styles={styles}
         />
@@ -351,7 +498,7 @@
         <TeamSection
             title={game.teamB.name}
             rows={getTeamRows('B')}
-            editable={isLive}
+            editable={isLive && !!user}
             onSelect={setSelectedUid}
             accent
             styles={styles}
@@ -370,7 +517,9 @@
                 </div>
 
                 <div className={styles.drawerRow}>
-                <span className={styles.drawerLabel}>PTS — {selectedStat.points}</span>
+                <span className={styles.drawerLabel}>
+                    PTS — {selectedStat.points} ({selectedStat.threePointers || 0} de 3)
+                </span>
                 <div className={styles.drawerButtons}>
                     <button
                     className={styles.minusButton}

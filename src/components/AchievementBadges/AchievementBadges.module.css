@@ -1,0 +1,155 @@
+    .summary {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+    margin-bottom: var(--spacing-md);
+    }
+
+    .grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--spacing-sm);
+    }
+
+    .badge {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--spacing-xs);
+    padding: var(--spacing-sm) var(--spacing-xs);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    text-align: center;
+    min-height: 76px;
+    min-width: 0;
+    }
+
+    .badgeEarned {
+    color: var(--color-primary);
+    border-color: var(--color-primary);
+    }
+
+    .badgeLocked {
+    color: var(--color-text-tertiary);
+    opacity: 0.45;
+    }
+
+    .badgeLabel {
+    font-size: 10px;
+    font-weight: var(--font-weight-semibold);
+    line-height: 1.2;
+    overflow-wrap: break-word;
+    word-break: break-word;
+    }
+
+    .emptyText {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+    }
+
+    @media (min-width: 420px) {
+    .grid {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+    }
+
+    @media (min-width: 600px) {
+    .grid {
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+    }
+    }
+
+    /* ===== POPUP DA CONQUISTA ===== */
+    .overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: var(--z-modal-backdrop);
+    padding: var(--spacing-lg);
+    }
+
+    .popup {
+    position: relative;
+    width: 100%;
+    max-width: 320px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-2xl) var(--spacing-lg) var(--spacing-lg);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-xl);
+    text-align: center;
+    box-shadow: var(--shadow-lg);
+    }
+
+    .closeButton {
+    position: absolute;
+    top: var(--spacing-md);
+    right: var(--spacing-md);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    background: var(--color-bg-secondary);
+    border: none;
+    border-radius: 50%;
+    color: var(--color-text);
+    }
+
+    .popupIcon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 88px;
+    height: 88px;
+    border-radius: 50%;
+    margin-bottom: var(--spacing-sm);
+    }
+
+    .popupIconEarned {
+    background: var(--color-bg-secondary);
+    color: var(--color-primary);
+    }
+
+    .popupIconLocked {
+    background: var(--color-bg-secondary);
+    color: var(--color-text-tertiary);
+    opacity: 0.5;
+    }
+
+    .popupTitle {
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-extrabold);
+    color: var(--color-text);
+    }
+
+    .popupStatus {
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-bold);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 2px var(--spacing-md);
+    border-radius: var(--radius-full);
+    }
+
+    .statusEarned {
+    background: var(--color-success-light);
+    color: var(--color-success);
+    }
+
+    .statusLocked {
+    background: var(--color-bg-secondary);
+    color: var(--color-text-tertiary);
+    }
+
+    .popupDescription {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+    line-height: 1.5;
+    }

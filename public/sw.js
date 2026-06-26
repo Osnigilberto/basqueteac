@@ -31,8 +31,12 @@
     event.respondWith(
         fetch(event.request)
         .then((response) => {
+            // A Cache API só aceita respostas completas (status 200) — respostas
+            // parciais (206, comuns em arquivos de áudio) não podem ser cacheadas
+            if (response.status === 200) {
             const responseClone = response.clone()
             caches.open(CACHE_NAME).then((cache) => cache.put(event.request, responseClone))
+            }
             return response
         })
         .catch(() => caches.match(event.request).then((cached) => cached || caches.match('/')))

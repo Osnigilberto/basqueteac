@@ -292,3 +292,7 @@
     color: var(--color-text-tertiary);
     margin-top: 2px;
     }
+
+    .hiddenFileInput {
+    display: none;
+    }

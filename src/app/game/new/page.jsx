@@ -20,6 +20,10 @@
 
     const TARGET_PRESETS = [10, 15, 21, 30]
 
+    function getPlayerLabel(player) {
+    return player?.nickname || player?.name || 'Jogador'
+    }
+
     export default function NewGame() {
     const router = useRouter()
     const { user, loading } = useAuth()
@@ -28,24 +32,25 @@
     const [time, setTime] = useState('16:00')
     const [location, setLocation] = useState('Ginásio Municipal')
 
-    // null = sem limite ("Livre")
+    const [gameType, setGameType] = useState('teams')
+
     const [targetScore, setTargetScore] = useState(null)
     const [customTarget, setCustomTarget] = useState('')
 
-    // Lista de jogadores cadastrados no app (qualquer um que já logou)
     const [players, setPlayers] = useState([])
     const [loadingPlayers, setLoadingPlayers] = useState(true)
 
-    // Mapa { uid: 'A' | 'B' } — jogador sem entrada aqui não entra no jogo
-    const [assignments, setAssignments] = useState({})
+    const [roster, setRoster] = useState({})
+
+    const [duelPlayer1, setDuelPlayer1] = useState('')
+    const [duelPlayer2, setDuelPlayer2] = useState('')
+
     const [saving, setSaving] = useState(false)
 
-    // Protege a rota
     useEffect(() => {
         if (!loading && !user) router.push('/')
     }, [loading, user, router])
 
-    // Busca todos os jogadores cadastrados, ordenados por nome
     useEffect(() => {
         async function loadPlayers() {
         const snap = await getDocs(query(collection(db, 'users'), orderBy('name')))
@@ -55,16 +60,8 @@
         loadPlayers()
     }, [])
 
-    function setTeam(uid, team) {
-        setAssignments((prev) => {
-        // Clicar no time que já está selecionado remove o jogador do jogo
-        if (prev[uid] === team) {
-            const next = { ...prev }
-            delete next[uid]
-            return next
-        }
-        return { ...prev, [uid]: team }
-        })
+    function toggleRoster(uid) {
+        setRoster((prev) => ({ ...prev, [uid]: !prev[uid] }))
     }
 
     function commitCustomTarget() {
@@ -75,11 +72,16 @@
         setCustomTarget('')
     }
 
-    const teamACount = Object.values(assignments).filter((t) => t === 'A').length
-    const teamBCount = Object.values(assignments).filter((t) => t === 'B').length
-    const totalPlayers = teamACount + teamBCount
+    const rosterArray = Object.entries(roster).filter(([, checked]) => checked).map(([uid]) => uid)
 
-    const canSubmit = date && time && location && totalPlayers > 0 && !saving
+    const canSubmit =
+        date &&
+        time &&
+        location &&
+        !saving &&
+        (gameType === '1v1'
+        ? duelPlayer1 && duelPlayer2 && duelPlayer1 !== duelPlayer2
+        : rosterArray.length > 0)
 
     async function handleSubmit(event) {
         event.preventDefault()
@@ -88,29 +90,28 @@
         setSaving(true)
 
         const gameDateTime = Timestamp.fromDate(new Date(`${date}T${time}`))
-        const teamAPlayers = Object.entries(assignments).filter(([, t]) => t === 'A').map(([uid]) => uid)
-        const teamBPlayers = Object.entries(assignments).filter(([, t]) => t === 'B').map(([uid]) => uid)
-
-        // Cria o jogo + os documentos de stats (zerados) de cada jogador,
-        // tudo numa única transação em lote (ou todos salvam, ou nenhum salva)
         const batch = writeBatch(db)
         const gameRef = doc(collection(db, 'games'))
 
+        if (gameType === '1v1') {
+        const player1 = players.find((p) => p.uid === duelPlayer1)
+        const player2 = players.find((p) => p.uid === duelPlayer2)
+
         batch.set(gameRef, {
-        date: gameDateTime,
-        location,
-        status: 'scheduled',
-        targetScore, // null = sem limite; pode ser editado depois, durante o jogo
-        createdBy: user.uid,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-        teamA: { name: 'Time Branco', score: 0, players: teamAPlayers },
-        teamB: { name: 'Time Preto', score: 0, players: teamBPlayers },
+            date: gameDateTime,
+            location,
+            status: 'scheduled',
+            gameType: '1v1',
+            targetScore,
+            createdBy: user.uid,
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+            teamA: { name: getPlayerLabel(player1), score: 0, players: [duelPlayer1] },
+            teamB: { name: getPlayerLabel(player2), score: 0, players: [duelPlayer2] },
         })
 
-        teamAPlayers.forEach((uid) => {
-        batch.set(doc(db, 'games', gameRef.id, 'stats', uid), {
-            uid,
+        batch.set(doc(db, 'games', gameRef.id, 'stats', duelPlayer1), {
+            uid: duelPlayer1,
             team: 'A',
             points: 0,
             rebounds: 0,
@@ -118,11 +119,8 @@
             blocks: 0,
             steals: 0,
         })
-        })
-
-        teamBPlayers.forEach((uid) => {
-        batch.set(doc(db, 'games', gameRef.id, 'stats', uid), {
-            uid,
+        batch.set(doc(db, 'games', gameRef.id, 'stats', duelPlayer2), {
+            uid: duelPlayer2,
             team: 'B',
             points: 0,
             rebounds: 0,
@@ -130,7 +128,21 @@
             blocks: 0,
             steals: 0,
         })
+        } else {
+        batch.set(gameRef, {
+            date: gameDateTime,
+            location,
+            status: 'scheduled',
+            gameType: 'teams',
+            targetScore,
+            roster: rosterArray,
+            createdBy: user.uid,
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+            teamA: { name: 'Time Branco', score: 0, players: [] },
+            teamB: { name: 'Time Preto', score: 0, players: [] },
         })
+        }
 
         await batch.commit()
 
@@ -154,6 +166,26 @@
             <h1 className={styles.title}>Criar jogo</h1>
 
             <form className={styles.form} onSubmit={handleSubmit}>
+            <div className={styles.field}>
+                <span className={styles.label}>Tipo de jogo</span>
+                <div className={styles.typeToggle}>
+                <button
+                    type="button"
+                    className={`${styles.typeButton} ${gameType === 'teams' ? styles.typeButtonActive : ''}`}
+                    onClick={() => setGameType('teams')}
+                >
+                    Time x Time
+                </button>
+                <button
+                    type="button"
+                    className={`${styles.typeButton} ${gameType === '1v1' ? styles.typeButtonActive : ''}`}
+                    onClick={() => setGameType('1v1')}
+                >
+                    1x1
+                </button>
+                </div>
+            </div>
+
             <div className={styles.row}>
                 <label className={styles.field}>
                 <span className={styles.label}>Data</span>
@@ -237,60 +269,87 @@
                 </p>
             </div>
 
-            <div className={styles.field}>
+            {gameType === '1v1' ? (
+                <div className={styles.row}>
+                <label className={styles.field}>
+                    <span className={styles.label}>Jogador 1</span>
+                    <select
+                    className={styles.input}
+                    value={duelPlayer1}
+                    onChange={(e) => setDuelPlayer1(e.target.value)}
+                    >
+                    <option value="">Selecionar...</option>
+                    {players
+                        .filter((p) => p.uid !== duelPlayer2)
+                        .map((p) => (
+                        <option key={p.uid} value={p.uid}>
+                            {getPlayerLabel(p)}
+                        </option>
+                        ))}
+                    </select>
+                </label>
+
+                <label className={styles.field}>
+                    <span className={styles.label}>Jogador 2</span>
+                    <select
+                    className={styles.input}
+                    value={duelPlayer2}
+                    onChange={(e) => setDuelPlayer2(e.target.value)}
+                    >
+                    <option value="">Selecionar...</option>
+                    {players
+                        .filter((p) => p.uid !== duelPlayer1)
+                        .map((p) => (
+                        <option key={p.uid} value={p.uid}>
+                            {getPlayerLabel(p)}
+                        </option>
+                        ))}
+                    </select>
+                </label>
+                </div>
+            ) : (
+                <div className={styles.field}>
                 <div className={styles.playersHeader}>
-                <span className={styles.label}>Jogadores</span>
-                <span className={styles.teamCounts}>
-                    <span className={styles.countA}>Branco {teamACount}</span>
-                    ·
-                    <span className={styles.countB}>Preto {teamBCount}</span>
-                </span>
+                    <span className={styles.label}>Quem vai jogar?</span>
+                    <span className={styles.teamCounts}>{rosterArray.length} confirmado(s)</span>
                 </div>
 
                 {loadingPlayers ? (
-                <p className={styles.emptyText}>Carregando jogadores...</p>
+                    <p className={styles.emptyText}>Carregando jogadores...</p>
                 ) : players.length === 0 ? (
-                <p className={styles.emptyText}>Nenhum jogador cadastrado ainda.</p>
+                    <p className={styles.emptyText}>Nenhum jogador cadastrado ainda.</p>
                 ) : (
-                <div className={styles.playerList}>
+                    <div className={styles.playerList}>
                     {players.map((player) => (
-                    <div key={player.uid} className={styles.playerRow}>
+                        <button
+                        key={player.uid}
+                        type="button"
+                        className={`${styles.rosterRow} ${roster[player.uid] ? styles.rosterRowActive : ''}`}
+                        onClick={() => toggleRoster(player.uid)}
+                        >
                         <div className={styles.playerInfo}>
-                        {player.photoURL && (
+                            {player.photoURL && (
                             <Image
-                            src={player.photoURL}
-                            alt={player.name}
-                            width={32}
-                            height={32}
-                            className={styles.playerAvatar}
+                                src={player.photoURL}
+                                alt={player.name}
+                                width={32}
+                                height={32}
+                                className={styles.playerAvatar}
                             />
-                        )}
-                        <span className={styles.playerName}>
-                            {player.nickname || player.name || 'Jogador'}
-                        </span>
+                            )}
+                            <span className={styles.playerName}>{getPlayerLabel(player)}</span>
                         </div>
-
-                        <div className={styles.teamToggle}>
-                        <button
-                            type="button"
-                            className={`${styles.teamButton} ${assignments[player.uid] === 'A' ? styles.teamButtonActiveA : ''}`}
-                            onClick={() => setTeam(player.uid, 'A')}
-                        >
-                            Branco
+                        <span className={styles.rosterCheck}>{roster[player.uid] ? '✓' : ''}</span>
                         </button>
-                        <button
-                            type="button"
-                            className={`${styles.teamButton} ${assignments[player.uid] === 'B' ? styles.teamButtonActiveB : ''}`}
-                            onClick={() => setTeam(player.uid, 'B')}
-                        >
-                            Preto
-                        </button>
-                        </div>
-                    </div>
                     ))}
-                </div>
+                    </div>
                 )}
-            </div>
+
+                <p className={styles.targetHint}>
+                    Os times são definidos na hora do jogo — sem time pré-escolhido aqui.
+                </p>
+                </div>
+            )}
 
             <button className={styles.submitButton} type="submit" disabled={!canSubmit}>
                 {saving && <Loader2 size={16} className={styles.spin} />}

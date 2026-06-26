@@ -3,16 +3,14 @@
     import { useEffect, useRef, useState } from 'react'
     import { useRouter } from 'next/navigation'
     import Image from 'next/image'
-    import Script from 'next/script'
     import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore'
+    import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
     import { ArrowLeft, CheckCircle2, HelpCircle, Loader2 } from 'lucide-react'
     import { useAuth } from '@/hooks/useAuth'
-    import { db } from '@/lib/firebase'
+    import { db, storage } from '@/lib/firebase'
     import BottomNav from '@/components/BottomNav/BottomNav'
     import styles from './page.module.css'
 
-    // Posições de basquete com sigla (padrão internacional) e descrição
-    // pra quem não conhece o termo (mostrada no botão "?" de cada linha)
     const POSITIONS = [
     {
         id: 'PG',
@@ -54,6 +52,45 @@
     return age
     }
 
+    // Recorta a imagem no centro em formato quadrado e redimensiona antes de
+    // enviar — deixa o arquivo bem mais leve e sempre quadrado, sem precisar
+    // de nenhuma interface de recorte manual
+    function cropAndResizeImage(file, size = 480) {
+    return new Promise((resolve, reject) => {
+        const img = new window.Image()
+        const url = URL.createObjectURL(file)
+
+        img.onload = () => {
+        const minSide = Math.min(img.width, img.height)
+        const sx = (img.width - minSide) / 2
+        const sy = (img.height - minSide) / 2
+
+        const canvas = document.createElement('canvas')
+        canvas.width = size
+        canvas.height = size
+        const ctx = canvas.getContext('2d')
+        ctx.drawImage(img, sx, sy, minSide, minSide, 0, 0, size, size)
+
+        canvas.toBlob(
+            (blob) => {
+            URL.revokeObjectURL(url)
+            if (blob) resolve(blob)
+            else reject(new Error('Falha ao gerar a imagem'))
+            },
+            'image/jpeg',
+            0.85
+        )
+        }
+
+        img.onerror = () => {
+        URL.revokeObjectURL(url)
+        reject(new Error('Falha ao carregar a imagem'))
+        }
+
+        img.src = url
+    })
+    }
+
     export default function Profile() {
     const router = useRouter()
     const { user, loading } = useAuth()
@@ -72,10 +109,12 @@
     const [loadingProfile, setLoadingProfile] = useState(true)
     const [saving, setSaving] = useState(false)
     const [saved, setSaved] = useState(false)
+    const [uploadingPhoto, setUploadingPhoto] = useState(false)
 
     // Controla qual tooltip de posição está aberto (só um por vez)
     const [infoOpen, setInfoOpen] = useState(null)
     const positionsRef = useRef(null)
+    const fileInputRef = useRef(null)
 
     // Protege a rota: sem usuário logado, volta pra landing
     useEffect(() => {
@@ -145,30 +184,36 @@
         await setDoc(ref, { photoURL: url, updatedAt: serverTimestamp() }, { merge: true })
     }
 
-    // Abre o widget de upload do Cloudinary (script carregado via <Script> abaixo)
-    function openCloudinaryWidget() {
-        if (!window.cloudinary) return
+    // Pega o arquivo escolhido, recorta/redimensiona, sobe pro Firebase
+    // Storage (sempre no mesmo caminho — sobrescreve a foto anterior em
+    // vez de acumular arquivos antigos) e salva a URL final no perfil
+    async function handlePhotoSelected(event) {
+        const file = event.target.files?.[0]
+        event.target.value = '' // permite escolher o mesmo arquivo de novo depois, se quiser
+        if (!file) return
 
-        const widget = window.cloudinary.createUploadWidget(
-        {
-            cloudName: process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME,
-            uploadPreset: process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET,
-            cropping: true,
-            croppingAspectRatio: 1,
-            showSkipCropButton: false,
-            multiple: false,
-            sources: ['local', 'camera'],
-            maxFileSize: 5_000_000,
-            language: 'pt',
-        },
-        (error, result) => {
-            if (!error && result.event === 'success') {
-            savePhoto(result.info.secure_url)
-            }
+        if (!file.type.startsWith('image/')) {
+        alert('Escolhe um arquivo de imagem (JPG ou PNG).')
+        return
         }
-        )
+        if (file.size > 8_000_000) {
+        alert('Imagem muito grande — escolhe uma de até 8MB.')
+        return
+        }
 
-        widget.open()
+        setUploadingPhoto(true)
+        try {
+        const blob = await cropAndResizeImage(file)
+        const storageRef = ref(storage, `avatars/${user.uid}/profile.jpg`)
+        await uploadBytes(storageRef, blob, { contentType: 'image/jpeg' })
+        const url = await getDownloadURL(storageRef)
+        await savePhoto(url)
+        } catch (error) {
+        console.error('[handlePhotoSelected]', error)
+        alert('Não foi possível enviar a foto. Tenta de novo.')
+        } finally {
+        setUploadingPhoto(false)
+        }
     }
 
     // Salva todos os campos do formulário no Firestore
@@ -208,9 +253,6 @@
 
     return (
         <main className={styles.page}>
-        {/* Script do widget de upload do Cloudinary, carregado sob demanda */}
-        <Script src="https://upload-widget.cloudinary.com/global/all.js" strategy="lazyOnload" />
-
         <header className={styles.header}>
             <button className={styles.backButton} onClick={() => router.push('/dashboard')}>
             <ArrowLeft size={18} />
@@ -234,8 +276,21 @@
                 />
             )}
             <div className={styles.avatarActions}>
-                <button type="button" className={styles.changePhotoButton} onClick={openCloudinaryWidget}>
-                Alterar foto
+                <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className={styles.hiddenFileInput}
+                onChange={handlePhotoSelected}
+                />
+                <button
+                type="button"
+                className={styles.changePhotoButton}
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploadingPhoto}
+                >
+                {uploadingPhoto && <Loader2 size={16} className={styles.spin} />}
+                {uploadingPhoto ? 'Enviando...' : 'Alterar foto'}
                 </button>
                 <p className={styles.avatarHint}>JPG ou PNG, recortado em quadrado.</p>
             </div>

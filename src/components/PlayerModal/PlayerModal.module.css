@@ -220,3 +220,10 @@
         border-radius: var(--radius-xl);
     }
     }
+
+    .h2hScore {
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-bold);
+    color: var(--color-text);
+    margin-bottom: var(--spacing-md);
+    }

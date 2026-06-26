@@ -2,9 +2,11 @@
 
     import { useEffect, useState } from 'react'
     import Image from 'next/image'
-    import { collectionGroup, doc, getDoc, getDocs, query, where } from 'firebase/firestore'
-    import { X, TrendingUp } from 'lucide-react'
+    import { collection, collectionGroup, doc, getDoc, getDocs, query, where } from 'firebase/firestore'
+    import { X, TrendingUp, ArrowLeftRight, Medal } from 'lucide-react'
     import { db } from '@/lib/firebase'
+    import { useAuth } from '@/hooks/useAuth'
+    import AchievementBadges from '@/components/AchievementBadges/AchievementBadges'
     import styles from './PlayerModal.module.css'
 
     const POSITION_LABELS = {
@@ -15,7 +17,6 @@
     C: 'Pivô',
     }
 
-    // Calcula idade a partir da data de nascimento (string 'YYYY-MM-DD')
     function calculateAge(birthDateStr) {
     if (!birthDateStr) return null
     const birthDate = new Date(birthDateStr)
@@ -28,14 +29,6 @@
     return age
     }
 
-    // Converte centímetros (como guardamos no Firestore) pra metro com vírgula: 185 → "1,85 m"
-    function formatHeight(heightCm) {
-    if (!heightCm) return null
-    const meters = (heightCm / 100).toFixed(2).replace('.', ',')
-    return `${meters} cm`
-    }
-
-
     function formatShortDate(timestamp) {
     const date = timestamp.toDate()
     const dateStr = date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
@@ -44,10 +37,15 @@
     }
 
     export default function PlayerModal({ uid, onClose }) {
+    const { user: currentUser } = useAuth()
+
     const [profile, setProfile] = useState(null)
     const [loadingProfile, setLoadingProfile] = useState(true)
     const [gameLog, setGameLog] = useState([])
     const [loadingStats, setLoadingStats] = useState(true)
+
+    const [headToHead, setHeadToHead] = useState(null)
+    const [loadingH2H, setLoadingH2H] = useState(true)
 
     useEffect(() => {
         if (!uid) return
@@ -118,7 +116,56 @@
         fetchGameLog()
     }, [uid])
 
-    // Fecha com a tecla Esc
+    useEffect(() => {
+        async function fetchHeadToHead() {
+        if (!uid || !currentUser || uid === currentUser.uid) {
+            setLoadingH2H(false)
+            return
+        }
+
+        try {
+            const gamesSnap = await getDocs(query(collection(db, 'games'), where('status', '==', 'finished')))
+
+            const matches = []
+            gamesSnap.docs.forEach((gameDoc) => {
+            const game = gameDoc.data()
+            const meInA = game.teamA.players.includes(currentUser.uid)
+            const meInB = game.teamB.players.includes(currentUser.uid)
+            const themInA = game.teamA.players.includes(uid)
+            const themInB = game.teamB.players.includes(uid)
+
+            const opposed = (meInA && themInB) || (meInB && themInA)
+            if (!opposed) return
+
+            const myScore = meInA ? game.teamA.score : game.teamB.score
+            const theirScore = meInA ? game.teamB.score : game.teamA.score
+
+            matches.push({
+                gameId: gameDoc.id,
+                date: game.date,
+                myScore,
+                theirScore,
+                won: myScore > theirScore,
+            })
+            })
+
+            matches.sort((a, b) => b.date.toMillis() - a.date.toMillis())
+
+            setHeadToHead({
+            winsMe: matches.filter((m) => m.won).length,
+            winsThem: matches.filter((m) => !m.won).length,
+            matches,
+            })
+        } catch (error) {
+            console.error('[PlayerModal → headToHead]', error)
+        } finally {
+            setLoadingH2H(false)
+        }
+        }
+
+        fetchHeadToHead()
+    }, [uid, currentUser])
+
     useEffect(() => {
         function handleEscape(event) {
         if (event.key === 'Escape') onClose()
@@ -141,6 +188,7 @@
         : null
 
     const displayName = profile?.nickname || profile?.name || 'Jogador'
+    const showHeadToHead = currentUser && uid !== currentUser.uid
 
     return (
         <div className={styles.overlay} onClick={onClose}>
@@ -172,7 +220,7 @@
                     const age = calculateAge(profile.birthDate)
                     const details = [
                         age !== null ? `${age} anos` : null,
-                        formatHeight(profile.height),
+                        profile.height ? `${profile.height} cm` : null,
                         profile.weight ? `${profile.weight} kg` : null,
                     ].filter(Boolean)
                     return details.length > 0 ? (
@@ -278,6 +326,43 @@
                 ) : (
                 <p className={styles.emptyText}>Nenhuma estatística registrada ainda.</p>
                 )}
+
+                {showHeadToHead && (
+                <>
+                    <div className={styles.listHeader}>
+                    <ArrowLeftRight size={14} />
+                    CONFRONTO DIRETO
+                    </div>
+
+                    {loadingH2H ? (
+                    <p className={styles.emptyText}>Carregando...</p>
+                    ) : !headToHead || headToHead.matches.length === 0 ? (
+                    <p className={styles.emptyText}>Vocês ainda não jogaram um contra o outro.</p>
+                    ) : (
+                    <>
+                        <p className={styles.h2hScore}>
+                        Você {headToHead.winsMe} x {headToHead.winsThem} {displayName}
+                        </p>
+                        <div className={styles.gameLog}>
+                        {headToHead.matches.map((m) => (
+                            <div key={m.gameId} className={styles.gameLogRow}>
+                            <span className={styles.gameLogDate}>{formatShortDate(m.date)}</span>
+                            <span className={m.won ? styles.statsPositive : styles.statsNegative}>
+                                {m.myScore} - {m.theirScore} {m.won ? '(vitória sua)' : '(derrota sua)'}
+                            </span>
+                            </div>
+                        ))}
+                        </div>
+                    </>
+                    )}
+                </>
+                )}
+
+                <div className={styles.listHeader}>
+                <Medal size={14} />
+                CONQUISTAS
+                </div>
+                <AchievementBadges uid={uid} />
             </>
             )}
         </div>

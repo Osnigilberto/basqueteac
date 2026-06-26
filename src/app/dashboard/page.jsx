@@ -25,6 +25,7 @@
     MapPin,
     ArrowRight,
     Trophy,
+    Medal,
     } from 'lucide-react'
     import { useAuth } from '@/hooks/useAuth'
     import { auth, db } from '@/lib/firebase'
@@ -72,6 +73,7 @@
         steals: [],
     })
     const [loadingRankings, setLoadingRankings] = useState(true)
+
     const [selectedPlayerUid, setSelectedPlayerUid] = useState(null)
 
     // Protege a rota
@@ -255,7 +257,6 @@
 
     const firstName = user.displayName?.split(' ')[0] ?? 'jogador'
     const isLive = nextGame?.status === 'live'
-    const isPastDue = !isLive && nextGame?.status === 'scheduled' && nextGame.date.toDate() < new Date()
 
     return (
         <main className={styles.page}>
@@ -301,6 +302,18 @@
                     role="menuitem"
                     onClick={() => {
                     setMenuOpen(false)
+                    router.push('/achievements')
+                    }}
+                >
+                    <Medal size={16} />
+                    Conquistas
+                </button>
+
+                <button
+                    className={styles.dropdownItem}
+                    role="menuitem"
+                    onClick={() => {
+                    setMenuOpen(false)
                     router.push('/settings')
                     }}
                 >
@@ -326,7 +339,7 @@
         <div className={styles.content}>
             <section className={styles.greeting}>
             <h1>Olá, {firstName}</h1>
-            <p>Seja bem-vindo, pronto para jogar?</p>
+            <p>Pronto pra próximo jogo?</p>
             </section>
 
             <section className={styles.nextGame}>
@@ -348,12 +361,7 @@
                 <p className={styles.emptyText}>Carregando...</p>
             ) : nextGame ? (
                 <>
-                {!isLive && (
-                    <p className={styles.nextGameDate}>
-                    {formatGameDate(nextGame.date)}
-                    {isPastDue && <span className={styles.overdueBadge}>Atrasado</span>}
-                    </p>
-                )}
+                {!isLive && <p className={styles.nextGameDate}>{formatGameDate(nextGame.date)}</p>}
                 <p className={styles.nextGameLocation}>
                     <MapPin size={14} />
                     {nextGame.location}
@@ -433,8 +441,9 @@
         </div>
 
         <BottomNav />
+
         {selectedPlayerUid && (
-        <PlayerModal uid={selectedPlayerUid} onClose={() => setSelectedPlayerUid(null)} />
+            <PlayerModal uid={selectedPlayerUid} onClose={() => setSelectedPlayerUid(null)} />
         )}
         </main>
     )
