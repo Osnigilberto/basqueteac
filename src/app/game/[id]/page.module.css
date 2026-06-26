@@ -47,6 +47,18 @@
     color: var(--color-text-secondary);
     }
 
+    .shareButton {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    color: var(--color-text);
+    }
+
     /* ===== PLACAR ===== */
     .scoreBanner {
     display: flex;
@@ -91,6 +103,14 @@
     color: var(--color-text-tertiary);
     }
 
+    .mvpBanner {
+    text-align: center;
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-success);
+    margin: 0 var(--spacing-lg) var(--spacing-md);
+    }
+
     .gameInfo {
     display: flex;
     align-items: center;
@@ -99,6 +119,174 @@
     font-size: var(--font-size-sm);
     color: var(--color-text-secondary);
     margin-bottom: var(--spacing-xs);
+    }
+
+    /* ===== ALVO DE PONTOS ===== */
+    .targetReached {
+    text-align: center;
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-primary);
+    margin: 0 var(--spacing-lg) var(--spacing-md);
+    }
+
+    .targetRow {
+    display: flex;
+    justify-content: center;
+    margin: var(--spacing-sm) var(--spacing-lg) var(--spacing-md);
+    }
+
+    .targetDisplay {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    padding: var(--spacing-xs) var(--spacing-md);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-full);
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text-secondary);
+    }
+
+    .targetEditor {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    flex-wrap: wrap;
+    justify-content: center;
+    }
+
+    .targetButton {
+    padding: var(--spacing-xs) var(--spacing-md);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text);
+    min-height: 32px;
+    }
+
+    .targetButton:hover {
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+    }
+
+    .targetInput {
+    width: 64px;
+    padding: var(--spacing-xs) var(--spacing-sm);
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text);
+    text-align: center;
+    min-height: 32px;
+    }
+
+    .targetCancel {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    background: transparent;
+    border: none;
+    color: var(--color-text-tertiary);
+    }
+
+    /* ===== DEFINIR TIMES ===== */
+    .setupCard {
+    margin: 0 var(--spacing-lg) var(--spacing-lg);
+    padding: var(--spacing-lg);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-xl);
+    }
+
+    .setupHeader {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-bold);
+    letter-spacing: 0.08em;
+    color: var(--color-text-tertiary);
+    margin-bottom: var(--spacing-xs);
+    }
+
+    .setupHint {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+    margin-bottom: var(--spacing-md);
+    }
+
+    .setupList {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+    margin-bottom: var(--spacing-md);
+    }
+
+    .setupRow {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-sm);
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    }
+
+    .setupToggle {
+    display: flex;
+    gap: var(--spacing-xs);
+    flex-shrink: 0;
+    }
+
+    .setupTeamButton {
+    padding: var(--spacing-xs) var(--spacing-sm);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text-tertiary);
+    min-height: 32px;
+    }
+
+    .setupTeamButtonActiveA {
+    background: var(--color-text);
+    border-color: var(--color-text);
+    color: var(--color-bg);
+    }
+
+    .setupTeamButtonActiveB {
+    background: var(--color-primary);
+    border-color: var(--color-primary);
+    color: #fff;
+    }
+
+    .confirmTeamsButton {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    padding: var(--spacing-md);
+    background: var(--color-primary);
+    color: #fff;
+    border: none;
+    border-radius: var(--radius-lg);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-semibold);
+    min-height: 48px;
+    }
+
+    .confirmTeamsButton:disabled {
+    opacity: 0.5;
     }
 
     /* ===== BOTÕES DE STATUS ===== */
@@ -420,24 +608,4 @@
         max-width: 420px;
         border-radius: var(--radius-xl);
     }
-    }
-
-    .shareButton {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 36px;
-    height: 36px;
-    background: var(--color-surface);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
-    color: var(--color-text);
-    }
-
-    .mvpBanner {
-    text-align: center;
-    font-size: var(--font-size-sm);
-    font-weight: var(--font-weight-semibold);
-    color: var(--color-success);
-    margin: 0 var(--spacing-lg) var(--spacing-md);
     }
