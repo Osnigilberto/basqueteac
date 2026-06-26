@@ -3,6 +3,7 @@
   import { useEffect, useState } from 'react'
   import { useRouter } from 'next/navigation'
   import { signInWithPopup } from 'firebase/auth'
+  import { useAuth } from '@/hooks/useAuth'
   import {
     collection,
     getDocs,
@@ -26,10 +27,20 @@
   }
 
   export default function Home() {
-    const router = useRouter()
-    const [highlightGame, setHighlightGame] = useState(null)
-    const [loadingGame, setLoadingGame] = useState(true)
-    const { canInstall, promptInstall } = useInstallPrompt()
+  const router = useRouter()
+  const { user, loading: loadingAuth } = useAuth()
+  const [highlightGame, setHighlightGame] = useState(null)
+  const [loadingGame, setLoadingGame] = useState(true)
+  const { canInstall, promptInstall } = useInstallPrompt()
+
+  // Se já existe uma sessão válida salva no navegador, pula a landing
+  // e vai direto pro dashboard — sem isso, a pessoa sempre via essa
+  // tela de novo mesmo já estando logada
+  useEffect(() => {
+    if (!loadingAuth && user) {
+      router.push('/dashboard')
+    }
+  }, [loadingAuth, user, router])
 
     const handleGoogleLogin = async () => {
       try {
@@ -80,6 +91,10 @@
 
     const isLive = highlightGame?.status === 'live'
     const { dateStr, timeStr } = highlightGame ? formatGameDate(highlightGame.date) : {}
+
+    // Evita mostrar a landing por um instante pra quem já está logado
+    // (enquanto o redirecionamento acima ainda está sendo processado)
+    if (loadingAuth || user) return null
 
     return (
       <main className={styles.page}>

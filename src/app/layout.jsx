@@ -35,7 +35,7 @@
 
   export default function RootLayout({ children }) {
     return (
-      <html lang="pt-BR">
+      <html lang="pt-BR" suppressHydrationWarning>
         <head>
           {/* Aplica o tema salvo ANTES da página pintar, evitando o "flash"
               de aparecer um tema errado por um instante ao carregar */}
