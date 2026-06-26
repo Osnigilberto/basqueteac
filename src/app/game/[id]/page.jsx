@@ -234,6 +234,21 @@
         await batch.commit()
     }
 
+    // Desfaz especificamente uma cesta de 3 — diferente do "−1" genérico,
+    // esse aqui corrige o placar E o contador de cestas de 3 juntos
+    async function undoThreePointer(uid, team) {
+        const batch = writeBatch(db)
+        batch.update(doc(db, 'games', gameId), {
+        [`team${team}.score`]: increment(-3),
+        updatedAt: serverTimestamp(),
+        })
+        batch.update(doc(db, 'games', gameId, 'stats', uid), {
+        points: increment(-3),
+        threePointers: increment(-1),
+        })
+        await batch.commit()
+    }
+
     // Marca rebote / assistência / toco / roubo (não afeta o placar)
     async function addStat(uid, field, value) {
         await updateDoc(doc(db, 'games', gameId, 'stats', uid), {
@@ -527,6 +542,14 @@
                     onClick={() => addPoints(selectedUid, selectedStat.team, -1)}
                     >
                     −1
+                    </button>
+                    <button
+                    className={styles.minusButton}
+                    disabled={!selectedStat.threePointers}
+                    onClick={() => undoThreePointer(selectedUid, selectedStat.team)}
+                    title="Desfaz uma cesta de 3"
+                    >
+                    −3
                     </button>
                     <button className={styles.plusButton} onClick={() => addPoints(selectedUid, selectedStat.team, 1)}>
                     +1
