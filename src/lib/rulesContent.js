@@ -23,9 +23,10 @@
         ],
         },
         house: {
-        title: "Regras da casa (BasqueteAC)",
+        title: "Faltas e violações (BasqueteAC)",
         items: [
-            "Nenhuma regra da casa nesse modo — segue 100% o oficial FIBA, incluindo os 24 segundos de posse.",
+            "Faltas e violações seguem o padrão FIBA (aba \"Faltas\").",
+
         ],
         },
     },
