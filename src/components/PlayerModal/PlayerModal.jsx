@@ -1,9 +1,9 @@
     'use client'
 
-    import { useEffect, useState } from 'react'
+    import { useEffect, useMemo, useState } from 'react'
     import Image from 'next/image'
     import { collection, collectionGroup, doc, getDoc, getDocs, query, where } from 'firebase/firestore'
-    import { X, TrendingUp, ArrowLeftRight, Medal } from 'lucide-react'
+    import { X, TrendingUp, ArrowLeftRight, Medal, ChevronLeft, ChevronRight } from 'lucide-react'
     import { db } from '@/lib/firebase'
     import { useAuth } from '@/hooks/useAuth'
     import AchievementBadges from '@/components/AchievementBadges/AchievementBadges'
@@ -36,6 +36,10 @@
     return `${dateStr} · ${timeStr}`
     }
 
+    function capitalize(text) {
+    return text.charAt(0).toUpperCase() + text.slice(1)
+    }
+
     export default function PlayerModal({ uid, onClose }) {
     const { user: currentUser } = useAuth()
 
@@ -43,6 +47,8 @@
     const [loadingProfile, setLoadingProfile] = useState(true)
     const [gameLog, setGameLog] = useState([])
     const [loadingStats, setLoadingStats] = useState(true)
+    const [period, setPeriod] = useState('month') // 'month' | 'season'
+    const [viewDate, setViewDate] = useState(() => new Date())
 
     const [headToHead, setHeadToHead] = useState(null)
     const [loadingH2H, setLoadingH2H] = useState(true)
@@ -64,6 +70,8 @@
         loadProfile()
     }, [uid])
 
+    // Busca uma vez só todo o histórico do jogador (já vem com a data do jogo).
+    // A navegação por mês/temporada é feita em memória depois, sem leituras extras.
     useEffect(() => {
         if (!uid) return
 
@@ -174,16 +182,61 @@
         return () => document.removeEventListener('keydown', handleEscape)
     }, [onClose])
 
-    const gamesPlayed = gameLog.length
+    function changePeriod(next) {
+        setPeriod(next)
+        setViewDate(new Date()) // volta pro período atual ao trocar de modo
+    }
+
+    function goPrev() {
+        setViewDate((prev) => {
+        const d = new Date(prev)
+        if (period === 'month') d.setMonth(d.getMonth() - 1)
+        else d.setFullYear(d.getFullYear() - 1)
+        return d
+        })
+    }
+
+    function goNext() {
+        setViewDate((prev) => {
+        const d = new Date(prev)
+        if (period === 'month') d.setMonth(d.getMonth() + 1)
+        else d.setFullYear(d.getFullYear() + 1)
+        return d
+        })
+    }
+
+    const now = new Date()
+    const isAtPresent =
+        period === 'month'
+        ? viewDate.getMonth() === now.getMonth() && viewDate.getFullYear() === now.getFullYear()
+        : viewDate.getFullYear() === now.getFullYear()
+
+    const periodLabel =
+        period === 'month'
+        ? capitalize(viewDate.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }))
+        : `${viewDate.getFullYear()}`
+
+    // Filtra o histórico já carregado pelo mês/ano selecionado — sem novas queries.
+    const filteredLog = useMemo(() => {
+        return gameLog.filter((g) => {
+        const d = g.date.toDate()
+        if (period === 'month') {
+            return d.getMonth() === viewDate.getMonth() && d.getFullYear() === viewDate.getFullYear()
+        }
+        return d.getFullYear() === viewDate.getFullYear()
+        })
+    }, [gameLog, period, viewDate])
+
+    const gamesPlayed = filteredLog.length
     const averages =
         gamesPlayed > 0
         ? {
-            points: gameLog.reduce((s, g) => s + g.points, 0) / gamesPlayed,
-            rebounds: gameLog.reduce((s, g) => s + g.rebounds, 0) / gamesPlayed,
-            assists: gameLog.reduce((s, g) => s + g.assists, 0) / gamesPlayed,
-            blocks: gameLog.reduce((s, g) => s + g.blocks, 0) / gamesPlayed,
-            steals: gameLog.reduce((s, g) => s + g.steals, 0) / gamesPlayed,
-            plusMinus: gameLog.reduce((s, g) => s + g.plusMinus, 0) / gamesPlayed,
+            points: filteredLog.reduce((s, g) => s + g.points, 0) / gamesPlayed,
+            rebounds: filteredLog.reduce((s, g) => s + g.rebounds, 0) / gamesPlayed,
+            assists: filteredLog.reduce((s, g) => s + g.assists, 0) / gamesPlayed,
+            blocks: filteredLog.reduce((s, g) => s + g.blocks, 0) / gamesPlayed,
+            steals: filteredLog.reduce((s, g) => s + g.steals, 0) / gamesPlayed,
+            plusMinus: filteredLog.reduce((s, g) => s + g.plusMinus, 0) / gamesPlayed,
             }
         : null
 
@@ -241,7 +294,45 @@
 
                 <div className={styles.listHeader}>
                 <TrendingUp size={14} />
-                MÉDIAS DA TEMPORADA
+                MÉDIAS {period === 'month' ? 'DO MÊS' : 'DA TEMPORADA'}
+                </div>
+
+                <div className={styles.periodToggle}>
+                <button
+                    type="button"
+                    className={`${styles.periodButton} ${period === 'month' ? styles.periodButtonActive : ''}`}
+                    onClick={() => changePeriod('month')}
+                >
+                    Mensal
+                </button>
+                <button
+                    type="button"
+                    className={`${styles.periodButton} ${period === 'season' ? styles.periodButtonActive : ''}`}
+                    onClick={() => changePeriod('season')}
+                >
+                    Temporada
+                </button>
+                </div>
+
+                <div className={styles.periodNav}>
+                <button
+                    type="button"
+                    className={styles.periodNavButton}
+                    onClick={goPrev}
+                    aria-label="Período anterior"
+                >
+                    <ChevronLeft size={18} />
+                </button>
+                <span className={styles.periodNavLabel}>{periodLabel}</span>
+                <button
+                    type="button"
+                    className={styles.periodNavButton}
+                    onClick={goNext}
+                    disabled={isAtPresent}
+                    aria-label="Próximo período"
+                >
+                    <ChevronRight size={18} />
+                </button>
                 </div>
 
                 {loadingStats ? (
@@ -291,7 +382,7 @@
                     </div>
 
                     <div className={styles.gameLog}>
-                    {gameLog.map((g) => (
+                    {filteredLog.map((g) => (
                         <div key={g.gameId} className={styles.gameLogRow}>
                         <div className={styles.gameLogInfo}>
                             <span className={styles.gameLogDate}>{formatShortDate(g.date)}</span>
@@ -307,11 +398,7 @@
                             <span>{g.steals}<small>ROU</small></span>
                             <span
                             className={
-                                g.plusMinus > 0
-                                ? styles.statsPositive
-                                : g.plusMinus < 0
-                                ? styles.statsNegative
-                                : ''
+                                g.plusMinus > 0 ? styles.statsPositive : g.plusMinus < 0 ? styles.statsNegative : ''
                             }
                             >
                             {g.plusMinus > 0 ? '+' : ''}
@@ -324,7 +411,11 @@
                     </div>
                 </>
                 ) : (
-                <p className={styles.emptyText}>Nenhuma estatística registrada ainda.</p>
+                <p className={styles.emptyText}>
+                    {period === 'month'
+                    ? 'Nenhum jogo neste mês.'
+                    : 'Nenhum jogo nesta temporada.'}
+                </p>
                 )}
 
                 {showHeadToHead && (

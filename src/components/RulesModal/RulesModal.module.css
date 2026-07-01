@@ -1,0 +1,180 @@
+    /* src/components/RulesModal/RulesModal.module.css */
+
+    .overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: var(--z-dropdown, 1000);
+    padding: var(--spacing-lg);
+    }
+
+    .modal {
+    width: 100%;
+    max-width: 480px;
+    max-height: 85vh;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-xl);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    }
+
+    .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--spacing-lg) var(--spacing-lg) var(--spacing-sm);
+    }
+
+    .title {
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-extrabold);
+    letter-spacing: -0.01em;
+    color: var(--color-text);
+    margin: 0;
+    }
+
+    .closeButton {
+    background: transparent;
+    border: none;
+    color: var(--color-text-tertiary);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--spacing-xs);
+    border-radius: var(--radius-md);
+    }
+
+    .closeButton:hover {
+    background: var(--color-bg-secondary);
+    color: var(--color-text);
+    }
+
+    .tabs {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 2px;
+    margin: 0 var(--spacing-lg) var(--spacing-md);
+    padding: 3px;
+    background: var(--color-bg-secondary);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    }
+
+    .tab {
+    border: none;
+    background: transparent;
+    color: var(--color-text-secondary);
+    font-size: 11px;
+    font-weight: var(--font-weight-semibold);
+    padding: var(--spacing-xs) 2px;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    }
+
+    .tabActive {
+    background: var(--color-primary);
+    border-color: var(--color-primary);
+    color: var(--color-text-on-primary, #fff);
+    border-radius: var(--radius-md);
+    }
+
+    .content {
+    padding: var(--spacing-xs) var(--spacing-lg) var(--spacing-xl);
+    overflow-y: auto;
+    }
+
+    .section {
+    margin-bottom: var(--spacing-lg);
+    }
+
+    .sectionTitle {
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-bold);
+    color: var(--color-text);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    margin: 0 0 var(--spacing-sm);
+    }
+
+    .badge {
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-bold);
+    text-transform: uppercase;
+    color: var(--color-primary);
+    background: color-mix(in srgb, var(--color-primary) 12%, transparent);
+    padding: 2px var(--spacing-sm);
+    border-radius: var(--radius-full);
+    }
+
+    .note {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+    line-height: 1.5;
+    margin: 0 0 var(--spacing-sm);
+    }
+
+    .ruleList {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+    }
+
+    .ruleList li {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+    line-height: 1.5;
+    padding-left: var(--spacing-md);
+    position: relative;
+    }
+
+    .ruleList li::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 7px;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--color-primary);
+    }
+
+    .statsList {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+    }
+
+    .statItem {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    }
+
+    .statLabel {
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-bold);
+    color: var(--color-text);
+    }
+
+    .statDescription {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+    line-height: 1.5;
+    }

@@ -1,6 +1,6 @@
     'use client'
 
-    import { useEffect, useRef, useState } from 'react'
+    import { useEffect, useMemo, useRef, useState } from 'react'
     import { useRouter } from 'next/navigation'
     import { signOut } from 'firebase/auth'
     import {
@@ -22,11 +22,15 @@
     Settings,
     LogOut,
     ChevronDown,
+    ChevronLeft,
+    ChevronRight,
     MapPin,
     ArrowRight,
     Trophy,
     Medal,
+    HelpCircle,
     } from 'lucide-react'
+    import RulesModal from '@/components/RulesModal/RulesModal'
     import { useAuth } from '@/hooks/useAuth'
     import { auth, db } from '@/lib/firebase'
     import BottomNav from '@/components/BottomNav/BottomNav'
@@ -52,6 +56,15 @@
     return `${dateStr} · ${timeStr}`
     }
 
+    function capitalize(text) {
+    return text.charAt(0).toUpperCase() + text.slice(1)
+    }
+
+    // Mesma fórmula do MVP de partida usada em game/[id]/page.jsx
+    function gameTotal(s) {
+    return (s.points || 0) + (s.rebounds || 0) + (s.assists || 0) + (s.blocks || 0) + (s.steals || 0)
+    }
+
     export default function Dashboard() {
     const router = useRouter()
     const { user, loading } = useAuth()
@@ -64,17 +77,17 @@
     const [nextGame, setNextGame] = useState(null)
     const [loadingNextGame, setLoadingNextGame] = useState(true)
 
-    // Top 3 de cada categoria, somando o total de todos os jogos finalizados
-    const [rankings, setRankings] = useState({
-        points: [],
-        rebounds: [],
-        assists: [],
-        blocks: [],
-        steals: [],
-    })
+    // Todos os jogos finalizados agrupados, com a data e as stats de cada jogador
+    // naquele jogo — usado pra calcular tanto os totais do período quanto o MVP.
+    const [finishedGames, setFinishedGames] = useState([])
+    const [profileMap, setProfileMap] = useState({})
     const [loadingRankings, setLoadingRankings] = useState(true)
 
+    const [period, setPeriod] = useState('month') // 'month' | 'season'
+    const [viewDate, setViewDate] = useState(() => new Date())
+
     const [selectedPlayerUid, setSelectedPlayerUid] = useState(null)
+    const [showRules, setShowRules] = useState(false)
 
     // Protege a rota
     useEffect(() => {
@@ -161,78 +174,69 @@
         fetchHighlightGame()
     }, [user])
 
-    // Ranking do grupo: soma os totais de todo mundo em todos os jogos
-    // finalizados, e pega o top 3 de cada categoria
+    // Busca todo o histórico de stats uma vez só, agrupado por jogo.
+    // A filtragem por mês/temporada acontece depois, em memória.
     useEffect(() => {
         if (!user) return
 
-        async function fetchRankings() {
+        async function fetchAllStats() {
         try {
             const statsSnap = await getDocs(collectionGroup(db, 'stats'))
-            const totalsByUser = {}
+            const gamesByIdCache = {}
+            const gamesMap = {}
 
             await Promise.all(
             statsSnap.docs.map(async (statDoc) => {
                 try {
                 const gameRef = statDoc.ref.parent.parent
-                const gameSnap = await getDoc(gameRef)
+                const gameId = gameRef.id
+
+                if (!gamesByIdCache[gameId]) {
+                    gamesByIdCache[gameId] = await getDoc(gameRef)
+                }
+                const gameSnap = gamesByIdCache[gameId]
                 if (!gameSnap.exists() || gameSnap.data().status !== 'finished') return
 
                 const data = statDoc.data()
                 const uid = data.uid
                 if (!uid) return
 
-                if (!totalsByUser[uid]) {
-                    totalsByUser[uid] = { points: 0, rebounds: 0, assists: 0, blocks: 0, steals: 0 }
+                if (!gamesMap[gameId]) {
+                    gamesMap[gameId] = { date: gameSnap.data().date, players: [] }
                 }
-                totalsByUser[uid].points += data.points || 0
-                totalsByUser[uid].rebounds += data.rebounds || 0
-                totalsByUser[uid].assists += data.assists || 0
-                totalsByUser[uid].blocks += data.blocks || 0
-                totalsByUser[uid].steals += data.steals || 0
+                gamesMap[gameId].players.push({
+                    uid,
+                    points: data.points || 0,
+                    rebounds: data.rebounds || 0,
+                    assists: data.assists || 0,
+                    blocks: data.blocks || 0,
+                    steals: data.steals || 0,
+                })
                 } catch (innerError) {
-                console.error('[fetchRankings → getDoc do jogo]', innerError)
+                console.error('[fetchAllStats → getDoc do jogo]', innerError)
                 }
             })
             )
 
-            const uids = Object.keys(totalsByUser)
+            const games = Object.values(gamesMap)
+            setFinishedGames(games)
+
+            const uids = Array.from(new Set(games.flatMap((g) => g.players.map((p) => p.uid))))
             const profiles = await Promise.all(
             uids.map(async (uid) => {
                 const snap = await getDoc(doc(db, 'users', uid))
                 return [uid, snap.exists() ? snap.data() : {}]
             })
             )
-            const profileMap = Object.fromEntries(profiles)
-
-            function topThree(field) {
-            return uids
-                .map((uid) => ({
-                uid,
-                name: profileMap[uid]?.nickname || profileMap[uid]?.name || 'Jogador',
-                photoURL: profileMap[uid]?.photoURL || null,
-                value: totalsByUser[uid][field],
-                }))
-                .filter((p) => p.value > 0)
-                .sort((a, b) => b.value - a.value)
-                .slice(0, 3)
-            }
-
-            setRankings({
-            points: topThree('points'),
-            rebounds: topThree('rebounds'),
-            assists: topThree('assists'),
-            blocks: topThree('blocks'),
-            steals: topThree('steals'),
-            })
+            setProfileMap(Object.fromEntries(profiles))
         } catch (error) {
-            console.error('[fetchRankings → query principal]', error)
+            console.error('[fetchAllStats → query principal]', error)
         } finally {
             setLoadingRankings(false)
         }
         }
 
-        fetchRankings()
+        fetchAllStats()
     }, [user])
 
     // Fecha o dropdown ao clicar fora ou apertar Esc
@@ -253,6 +257,122 @@
         }
     }, [])
 
+    function changePeriod(next) {
+        setPeriod(next)
+        setViewDate(new Date())
+    }
+
+    function goPrev() {
+        setViewDate((prev) => {
+        const d = new Date(prev)
+        if (period === 'month') d.setMonth(d.getMonth() - 1)
+        else d.setFullYear(d.getFullYear() - 1)
+        return d
+        })
+    }
+
+    function goNext() {
+        setViewDate((prev) => {
+        const d = new Date(prev)
+        if (period === 'month') d.setMonth(d.getMonth() + 1)
+        else d.setFullYear(d.getFullYear() + 1)
+        return d
+        })
+    }
+
+    const now = new Date()
+    const isAtPresent =
+        period === 'month'
+        ? viewDate.getMonth() === now.getMonth() && viewDate.getFullYear() === now.getFullYear()
+        : viewDate.getFullYear() === now.getFullYear()
+
+    const periodLabel =
+        period === 'month'
+        ? capitalize(viewDate.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }))
+        : `${viewDate.getFullYear()}`
+
+    // Jogos do período selecionado — filtrado em memória, sem novas queries.
+    const gamesInPeriod = useMemo(() => {
+        return finishedGames.filter((g) => {
+        const d = g.date.toDate()
+        if (period === 'month') {
+            return d.getMonth() === viewDate.getMonth() && d.getFullYear() === viewDate.getFullYear()
+        }
+        return d.getFullYear() === viewDate.getFullYear()
+        })
+    }, [finishedGames, period, viewDate])
+
+    // Ranking por categoria: soma os totais de cada jogador nos jogos do período
+    const rankings = useMemo(() => {
+        const totalsByUser = {}
+
+        gamesInPeriod.forEach((game) => {
+        game.players.forEach((p) => {
+            if (!totalsByUser[p.uid]) {
+            totalsByUser[p.uid] = { points: 0, rebounds: 0, assists: 0, blocks: 0, steals: 0 }
+            }
+            totalsByUser[p.uid].points += p.points
+            totalsByUser[p.uid].rebounds += p.rebounds
+            totalsByUser[p.uid].assists += p.assists
+            totalsByUser[p.uid].blocks += p.blocks
+            totalsByUser[p.uid].steals += p.steals
+        })
+        })
+
+        const uids = Object.keys(totalsByUser)
+
+        function topThree(field) {
+        return uids
+            .map((uid) => ({
+            uid,
+            name: profileMap[uid]?.nickname || profileMap[uid]?.name || 'Jogador',
+            photoURL: profileMap[uid]?.photoURL || null,
+            value: totalsByUser[uid][field],
+            }))
+            .filter((p) => p.value > 0)
+            .sort((a, b) => b.value - a.value)
+            .slice(0, 3)
+        }
+
+        return {
+        points: topThree('points'),
+        rebounds: topThree('rebounds'),
+        assists: topThree('assists'),
+        blocks: topThree('blocks'),
+        steals: topThree('steals'),
+        }
+    }, [gamesInPeriod, profileMap])
+
+    // MVP do período: conta quantas vezes cada jogador foi MVP de uma partida
+    // (mesma fórmula do MVP por jogo), dentro dos jogos do período selecionado.
+    const periodMvp = useMemo(() => {
+        const mvpCount = {}
+
+        gamesInPeriod.forEach((game) => {
+        if (game.players.length === 0) return
+        const withTotal = game.players.map((p) => ({ uid: p.uid, total: gameTotal(p) }))
+        const maxTotal = Math.max(...withTotal.map((p) => p.total))
+        if (maxTotal === 0) return
+        withTotal
+            .filter((p) => p.total === maxTotal)
+            .forEach((p) => {
+            mvpCount[p.uid] = (mvpCount[p.uid] || 0) + 1
+            })
+        })
+
+        const uids = Object.keys(mvpCount)
+        if (uids.length === 0) return []
+
+        const maxCount = Math.max(...uids.map((uid) => mvpCount[uid]))
+        return uids
+        .filter((uid) => mvpCount[uid] === maxCount)
+        .map((uid) => ({
+            uid,
+            name: profileMap[uid]?.nickname || profileMap[uid]?.name || 'Jogador',
+            count: maxCount,
+        }))
+    }, [gamesInPeriod, profileMap])
+
     if (loading || !user) return null
 
     const firstName = user.displayName?.split(' ')[0] ?? 'jogador'
@@ -265,74 +385,84 @@
             Basquete<span className={styles.logoAccent}>AC</span>
             </div>
 
-            <div className={styles.userMenu} ref={menuRef}>
+            <div className={styles.headerActions}>
             <button
+                className={styles.helpButton}
+                onClick={() => setShowRules(true)}
+                aria-label="Regras do jogo"
+            >
+                <HelpCircle size={20} />
+            </button>
+
+            <div className={styles.userMenu} ref={menuRef}>
+                <button
                 className={styles.userMenuTrigger}
                 onClick={() => setMenuOpen((open) => !open)}
                 aria-haspopup="menu"
                 aria-expanded={menuOpen}
-            >
+                >
                 {profilePhoto && (
-                <Image
+                    <Image
                     src={profilePhoto}
                     alt={user.displayName}
                     width={32}
                     height={32}
                     className={styles.avatar}
-                />
+                    />
                 )}
                 <ChevronDown
-                size={16}
-                className={styles.chevron}
-                style={{ transform: menuOpen ? 'rotate(180deg)' : 'none' }}
+                    size={16}
+                    className={styles.chevron}
+                    style={{ transform: menuOpen ? 'rotate(180deg)' : 'none' }}
                 />
-            </button>
+                </button>
 
-            {menuOpen && (
+                {menuOpen && (
                 <div className={styles.dropdown} role="menu">
-                <div className={styles.dropdownHeader}>
+                    <div className={styles.dropdownHeader}>
                     <span className={styles.dropdownName}>{user.displayName}</span>
                     <span className={styles.dropdownEmail}>{user.email}</span>
-                </div>
+                    </div>
 
-                <div className={styles.dropdownDivider} />
+                    <div className={styles.dropdownDivider} />
 
-                <button
+                    <button
                     className={styles.dropdownItem}
                     role="menuitem"
                     onClick={() => {
-                    setMenuOpen(false)
-                    router.push('/achievements')
+                        setMenuOpen(false)
+                        router.push('/achievements')
                     }}
-                >
+                    >
                     <Medal size={16} />
                     Conquistas
-                </button>
+                    </button>
 
-                <button
+                    <button
                     className={styles.dropdownItem}
                     role="menuitem"
                     onClick={() => {
-                    setMenuOpen(false)
-                    router.push('/settings')
+                        setMenuOpen(false)
+                        router.push('/settings')
                     }}
-                >
+                    >
                     <Settings size={16} />
                     Configurações
-                </button>
+                    </button>
 
-                <div className={styles.dropdownDivider} />
+                    <div className={styles.dropdownDivider} />
 
-                <button
+                    <button
                     className={styles.dropdownItemDanger}
                     role="menuitem"
                     onClick={() => signOut(auth)}
-                >
+                    >
                     <LogOut size={16} />
                     Sair
-                </button>
+                    </button>
                 </div>
-            )}
+                )}
+            </div>
             </div>
         </header>
 
@@ -397,45 +527,94 @@
                 RANKING DO GRUPO
             </div>
 
+            <div className={styles.periodToggle}>
+                <button
+                type="button"
+                className={`${styles.periodButton} ${period === 'month' ? styles.periodButtonActive : ''}`}
+                onClick={() => changePeriod('month')}
+                >
+                Mês
+                </button>
+                <button
+                type="button"
+                className={`${styles.periodButton} ${period === 'season' ? styles.periodButtonActive : ''}`}
+                onClick={() => changePeriod('season')}
+                >
+                Temporada
+                </button>
+            </div>
+
+            <div className={styles.periodNav}>
+                <button
+                type="button"
+                className={styles.periodNavButton}
+                onClick={goPrev}
+                aria-label="Período anterior"
+                >
+                <ChevronLeft size={18} />
+                </button>
+                <span className={styles.periodNavLabel}>{periodLabel}</span>
+                <button
+                type="button"
+                className={styles.periodNavButton}
+                onClick={goNext}
+                disabled={isAtPresent}
+                aria-label="Próximo período"
+                >
+                <ChevronRight size={18} />
+                </button>
+            </div>
+
             {loadingRankings ? (
                 <p className={styles.emptyText}>Carregando...</p>
             ) : (
-                <div className={styles.rankingGrid}>
-                {RANKING_CATEGORIES.map((cat) => (
-                    <div key={cat.key} className={styles.rankingCategory}>
-                    <span className={styles.rankingCategoryLabel}>{cat.label}</span>
+                <>
+                {periodMvp.length > 0 &&
+                    (period === 'month' || (now.getMonth() === 11 && now.getDate() === 12)) && (
+                    <p className={styles.mvpBanner}>
+                        🏅 MVP {period === 'month' ? 'do mês' : 'da temporada'}:{' '}
+                        {periodMvp.map((p) => p.name).join(' e ')} ({periodMvp[0].count}{' '}
+                        {periodMvp[0].count === 1 ? 'vez' : 'vezes'})
+                    </p>
+                    )}
 
-                    {rankings[cat.key].length === 0 ? (
-                        <p className={styles.rankingEmpty}>Sem dados ainda.</p>
-                    ) : (
+                <div className={styles.rankingGrid}>
+                    {RANKING_CATEGORIES.map((cat) => (
+                    <div key={cat.key} className={styles.rankingCategory}>
+                        <span className={styles.rankingCategoryLabel}>{cat.label}</span>
+
+                        {rankings[cat.key].length === 0 ? (
+                        <p className={styles.rankingEmpty}>Sem dados nesse período.</p>
+                        ) : (
                         rankings[cat.key].map((p, index) => (
-                        <button
+                            <button
                             key={p.uid}
                             className={styles.rankingRow}
                             onClick={() => setSelectedPlayerUid(p.uid)}
-                        >
-                            <span
-                            className={`${styles.rankingPosition} ${index === 0 ? styles.rankingFirst : ''}`}
                             >
-                            {index + 1}
+                            <span
+                                className={`${styles.rankingPosition} ${index === 0 ? styles.rankingFirst : ''}`}
+                            >
+                                {index + 1}
                             </span>
                             {p.photoURL && (
-                            <Image
+                                <Image
                                 src={p.photoURL}
                                 alt={p.name}
                                 width={24}
                                 height={24}
                                 className={styles.rankingAvatar}
-                            />
+                                />
                             )}
                             <span className={styles.rankingName}>{p.name}</span>
                             <span className={styles.rankingValue}>{p.value}</span>
-                        </button>
+                            </button>
                         ))
-                    )}
+                        )}
                     </div>
-                ))}
+                    ))}
                 </div>
+                </>
             )}
             </section>
         </div>
@@ -445,6 +624,8 @@
         {selectedPlayerUid && (
             <PlayerModal uid={selectedPlayerUid} onClose={() => setSelectedPlayerUid(null)} />
         )}
+
+        {showRules && <RulesModal onClose={() => setShowRules(false)} />}
         </main>
     )
     }
