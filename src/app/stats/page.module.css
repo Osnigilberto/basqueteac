@@ -246,3 +246,72 @@
     font-weight: var(--font-weight-semibold);
     color: var(--color-text);
     }
+
+    .rankingGrid {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-lg);
+    }
+
+    .rankingCategory {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+    }
+
+    .rankingCategoryLabel {
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-bold);
+    letter-spacing: 0.06em;
+    color: var(--color-text-tertiary);
+    }
+
+    .rankingEmpty {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+    }
+
+    .rankingRow {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-xs) 0;
+    width: 100%;
+    background: transparent;
+    border: none;
+    text-align: left;
+    }
+
+    .rankingPosition {
+    width: 18px;
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-bold);
+    color: var(--color-text-tertiary);
+    text-align: center;
+    flex-shrink: 0;
+    }
+
+    .rankingFirst {
+    color: var(--color-primary);
+    }
+
+    .rankingAvatar {
+    border-radius: 50%;
+    flex-shrink: 0;
+    }
+
+    .rankingName {
+    flex: 1;
+    font-size: var(--font-size-sm);
+    color: var(--color-text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    }
+
+    .rankingValue {
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-bold);
+    color: var(--color-text);
+    flex-shrink: 0;
+    }

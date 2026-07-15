@@ -3,11 +3,21 @@
     import { useEffect, useMemo, useState } from 'react'
     import { useRouter } from 'next/navigation'
     import { collectionGroup, doc, getDoc, getDocs, query, where } from 'firebase/firestore'
-    import { TrendingUp, ChevronLeft, ChevronRight } from 'lucide-react'
+    import { TrendingUp, ChevronLeft, ChevronRight, Trophy } from 'lucide-react'
     import { useAuth } from '@/hooks/useAuth'
     import { db } from '@/lib/firebase'
     import BottomNav from '@/components/BottomNav/BottomNav'
+    import PlayerModal from '@/components/PlayerModal/PlayerModal'
+    import Image from 'next/image'
     import styles from './page.module.css'
+
+    const RANKING_CATEGORIES = [
+    { key: 'points', label: 'PONTOS' },
+    { key: 'rebounds', label: 'REBOTES' },
+    { key: 'assists', label: 'ASSISTÊNCIAS' },
+    { key: 'blocks', label: 'TOCOS' },
+    { key: 'steals', label: 'ROUBOS' },
+    ]
 
     function formatShortDate(timestamp) {
     const date = timestamp.toDate()
@@ -28,6 +38,12 @@
     const [loadingStats, setLoadingStats] = useState(true)
     const [period, setPeriod] = useState('month') // 'month' | 'season'
     const [viewDate, setViewDate] = useState(() => new Date())
+
+    // Ranking geral do grupo — todos os jogadores, todas as categorias.
+    const [finishedGames, setFinishedGames] = useState([])
+    const [profileMap, setProfileMap] = useState({})
+    const [loadingGeneralRanking, setLoadingGeneralRanking] = useState(true)
+    const [selectedPlayerUid, setSelectedPlayerUid] = useState(null)
 
     useEffect(() => {
         if (!loading && !user) router.push('/')
@@ -88,6 +104,71 @@
         fetchGameLog()
     }, [user])
 
+    // Busca o histórico de TODOS os jogadores, agrupado por jogo — usado
+    // pro ranking geral abaixo. Mesma ideia do dashboard.
+    useEffect(() => {
+        if (!user) return
+
+        async function fetchAllStats() {
+        try {
+            const statsSnap = await getDocs(collectionGroup(db, 'stats'))
+            const gamesByIdCache = {}
+            const gamesMap = {}
+
+            await Promise.all(
+            statsSnap.docs.map(async (statDoc) => {
+                try {
+                const gameRef = statDoc.ref.parent.parent
+                const gameId = gameRef.id
+
+                if (!gamesByIdCache[gameId]) {
+                    gamesByIdCache[gameId] = await getDoc(gameRef)
+                }
+                const gameSnap = gamesByIdCache[gameId]
+                if (!gameSnap.exists() || gameSnap.data().status !== 'finished') return
+
+                const data = statDoc.data()
+                const uid = data.uid
+                if (!uid) return
+
+                if (!gamesMap[gameId]) {
+                    gamesMap[gameId] = { date: gameSnap.data().date, players: [] }
+                }
+                gamesMap[gameId].players.push({
+                    uid,
+                    points: data.points || 0,
+                    rebounds: data.rebounds || 0,
+                    assists: data.assists || 0,
+                    blocks: data.blocks || 0,
+                    steals: data.steals || 0,
+                })
+                } catch (innerError) {
+                console.error('[fetchAllStats → getDoc do jogo]', innerError)
+                }
+            })
+            )
+
+            const games = Object.values(gamesMap)
+            setFinishedGames(games)
+
+            const uids = Array.from(new Set(games.flatMap((g) => g.players.map((p) => p.uid))))
+            const profiles = await Promise.all(
+            uids.map(async (uid) => {
+                const snap = await getDoc(doc(db, 'users', uid))
+                return [uid, snap.exists() ? snap.data() : {}]
+            })
+            )
+            setProfileMap(Object.fromEntries(profiles))
+        } catch (error) {
+            console.error('[fetchAllStats → query principal]', error)
+        } finally {
+            setLoadingGeneralRanking(false)
+        }
+        }
+
+        fetchAllStats()
+    }, [user])
+
     function changePeriod(next) {
         setPeriod(next)
         setViewDate(new Date()) // volta pro período atual ao trocar de modo
@@ -122,7 +203,7 @@
         ? capitalize(viewDate.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }))
         : `${viewDate.getFullYear()}`
 
-    // Filtra o histórico já carregado pelo mês/ano selecionado — sem novas queries.
+    // Filtra o histórico do jogador logado pelo mês/ano selecionado — sem novas queries.
     const filteredLog = useMemo(() => {
         return gameLog.filter((g) => {
         const d = g.date.toDate()
@@ -132,6 +213,66 @@
         return d.getFullYear() === viewDate.getFullYear()
         })
     }, [gameLog, period, viewDate])
+
+    // Jogos do período selecionado, pro ranking geral — mesmo período do card pessoal.
+    const gamesInPeriod = useMemo(() => {
+        return finishedGames.filter((g) => {
+        const d = g.date.toDate()
+        if (period === 'month') {
+            return d.getMonth() === viewDate.getMonth() && d.getFullYear() === viewDate.getFullYear()
+        }
+        return d.getFullYear() === viewDate.getFullYear()
+        })
+    }, [finishedGames, period, viewDate])
+
+    // Ranking geral: TODOS os jogadores, sem cortar em top 5 — mesma lógica
+    // de posição com empate (dense ranking) usada no dashboard.
+    const generalRanking = useMemo(() => {
+        const totalsByUser = {}
+
+        gamesInPeriod.forEach((game) => {
+        game.players.forEach((p) => {
+            if (!totalsByUser[p.uid]) {
+            totalsByUser[p.uid] = { points: 0, rebounds: 0, assists: 0, blocks: 0, steals: 0 }
+            }
+            totalsByUser[p.uid].points += p.points
+            totalsByUser[p.uid].rebounds += p.rebounds
+            totalsByUser[p.uid].assists += p.assists
+            totalsByUser[p.uid].blocks += p.blocks
+            totalsByUser[p.uid].steals += p.steals
+        })
+        })
+
+        const uids = Object.keys(totalsByUser)
+
+        function fullList(field) {
+        const sorted = uids
+            .map((uid) => ({
+            uid,
+            name: profileMap[uid]?.nickname || profileMap[uid]?.name || 'Jogador',
+            photoURL: profileMap[uid]?.photoURL || null,
+            value: totalsByUser[uid][field],
+            }))
+            .filter((p) => p.value > 0)
+            .sort((a, b) => b.value - a.value)
+
+        const ranked = []
+        sorted.forEach((p, i) => {
+            const rank = i === 0 ? 1 : sorted[i - 1].value === p.value ? ranked[i - 1].rank : ranked[i - 1].rank + 1
+            ranked.push({ ...p, rank })
+        })
+
+        return ranked
+        }
+
+        return {
+        points: fullList('points'),
+        rebounds: fullList('rebounds'),
+        assists: fullList('assists'),
+        blocks: fullList('blocks'),
+        steals: fullList('steals'),
+        }
+    }, [gamesInPeriod, profileMap])
 
     if (loading || !user) return null
 
@@ -299,9 +440,61 @@
                 </p>
             )}
             </section>
+
+            <section className={styles.statsCard}>
+            <div className={styles.listHeader}>
+                <Trophy size={14} />
+                RANKING GERAL {period === 'month' ? 'DO MÊS' : 'DA TEMPORADA'}
+            </div>
+
+            {loadingGeneralRanking ? (
+                <p className={styles.emptyText}>Carregando...</p>
+            ) : (
+                <div className={styles.rankingGrid}>
+                {RANKING_CATEGORIES.map((cat) => (
+                    <div key={cat.key} className={styles.rankingCategory}>
+                    <span className={styles.rankingCategoryLabel}>{cat.label}</span>
+
+                    {generalRanking[cat.key].length === 0 ? (
+                        <p className={styles.rankingEmpty}>Sem dados nesse período.</p>
+                    ) : (
+                        generalRanking[cat.key].map((p) => (
+                        <button
+                            key={p.uid}
+                            className={styles.rankingRow}
+                            onClick={() => setSelectedPlayerUid(p.uid)}
+                        >
+                            <span
+                            className={`${styles.rankingPosition} ${p.rank === 1 ? styles.rankingFirst : ''}`}
+                            >
+                            {p.rank}
+                            </span>
+                            {p.photoURL && (
+                            <Image
+                                src={p.photoURL}
+                                alt={p.name}
+                                width={24}
+                                height={24}
+                                className={styles.rankingAvatar}
+                            />
+                            )}
+                            <span className={styles.rankingName}>{p.name}</span>
+                            <span className={styles.rankingValue}>{p.value}</span>
+                        </button>
+                        ))
+                    )}
+                    </div>
+                ))}
+                </div>
+            )}
+            </section>
         </div>
 
         <BottomNav />
+
+        {selectedPlayerUid && (
+            <PlayerModal uid={selectedPlayerUid} onClose={() => setSelectedPlayerUid(null)} />
+        )}
         </main>
     )
     }

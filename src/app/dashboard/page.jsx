@@ -321,8 +321,8 @@
 
         const uids = Object.keys(totalsByUser)
 
-        function topThree(field) {
-        return uids
+        function topFive(field) {
+        const sorted = uids
             .map((uid) => ({
             uid,
             name: profileMap[uid]?.nickname || profileMap[uid]?.name || 'Jogador',
@@ -331,15 +331,24 @@
             }))
             .filter((p) => p.value > 0)
             .sort((a, b) => b.value - a.value)
-            .slice(0, 3)
+
+        // Ranking "denso": empate divide a posição, e o próximo valor
+        // diferente simplesmente incrementa (1, 2, 2, 3, 3 — sem pular número).
+        const ranked = []
+        sorted.forEach((p, i) => {
+            const rank = i === 0 ? 1 : sorted[i - 1].value === p.value ? ranked[i - 1].rank : ranked[i - 1].rank + 1
+            ranked.push({ ...p, rank })
+        })
+
+        return ranked.slice(0, 5)
         }
 
         return {
-        points: topThree('points'),
-        rebounds: topThree('rebounds'),
-        assists: topThree('assists'),
-        blocks: topThree('blocks'),
-        steals: topThree('steals'),
+        points: topFive('points'),
+        rebounds: topFive('rebounds'),
+        assists: topFive('assists'),
+        blocks: topFive('blocks'),
+        steals: topFive('steals'),
         }
     }, [gamesInPeriod, profileMap])
 
@@ -586,16 +595,16 @@
                         {rankings[cat.key].length === 0 ? (
                         <p className={styles.rankingEmpty}>Sem dados nesse período.</p>
                         ) : (
-                        rankings[cat.key].map((p, index) => (
+                        rankings[cat.key].map((p) => (
                             <button
                             key={p.uid}
                             className={styles.rankingRow}
                             onClick={() => setSelectedPlayerUid(p.uid)}
                             >
                             <span
-                                className={`${styles.rankingPosition} ${index === 0 ? styles.rankingFirst : ''}`}
+                                className={`${styles.rankingPosition} ${p.rank === 1 ? styles.rankingFirst : ''}`}
                             >
-                                {index + 1}
+                                {p.rank}
                             </span>
                             {p.photoURL && (
                                 <Image
