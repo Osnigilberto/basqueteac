@@ -1,32 +1,33 @@
-    'use client'
+'use client'
 
-    import Link from 'next/link'
-    import { usePathname } from 'next/navigation'
-    import { Home, CalendarDays, Users, TrendingUp, UserRound } from 'lucide-react'
-    import styles from './BottomNav.module.css'
+import Link from 'next/link'
+import { usePathname } from 'next/navigation'
+import { Home, CalendarDays, Target, TrendingUp, Users, UserRound } from 'lucide-react'
+import styles from './BottomNav.module.css'
 
-    const TABS = [
-    { href: '/dashboard', label: 'Início', icon: Home },
-    { href: '/game', label: 'Jogos', icon: CalendarDays },
-    { href: '/players', label: 'Jogadores', icon: Users },
-    { href: '/stats', label: 'Estatísticas', icon: TrendingUp },
-    { href: '/profile', label: 'Perfil', icon: UserRound },
-    ]
+const TABS = [
+  { href: '/dashboard', label: 'Início', icon: Home },
+  { href: '/game', label: 'Jogos', icon: CalendarDays },
+  { href: '/training', label: 'Treinos', icon: Target },
+  { href: '/stats', label: 'Stats', icon: TrendingUp },
+  { href: '/players', label: 'Atletas', icon: Users },
+  { href: '/profile', label: 'Perfil', icon: UserRound },
+]
 
-    export default function BottomNav() {
-    const pathname = usePathname()
+export default function BottomNav() {
+  const pathname = usePathname()
 
-    return (
-        <nav className={styles.nav}>
-        {TABS.map(({ href, label, icon: Icon }) => {
-            const active = pathname === href
-            return (
-            <Link key={href} href={href} className={`${styles.tab} ${active ? styles.tabActive : ''}`}>
-                <Icon size={20} />
-                <span>{label}</span>
-            </Link>
-            )
-        })}
-        </nav>
-    )
-    }
+  return (
+    <nav className={styles.nav}>
+      {TABS.map(({ href, label, icon: Icon }) => {
+        const active = pathname === href || (href !== '/dashboard' && pathname.startsWith(href))
+        return (
+          <Link key={href} href={href} className={`${styles.tab} ${active ? styles.tabActive : ''}`}>
+            <Icon size={19} />
+            <span>{label}</span>
+          </Link>
+        )
+      })}
+    </nav>
+  )
+}
