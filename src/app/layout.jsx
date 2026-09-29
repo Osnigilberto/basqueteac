@@ -1,10 +1,17 @@
-  import { Inter } from 'next/font/google'
+  import { Inter, Barlow_Condensed } from 'next/font/google'
   import './globals.css'
   import ServiceWorkerRegister from '@/components/ServiceWorkerRegister'
 
   const inter = Inter({
     subsets: ['latin'],
     variable: '--font-inter',
+  })
+
+  // Tipografia condensada esportiva usada nos títulos e números dos treinos
+  const barlowCondensed = Barlow_Condensed({
+    subsets: ['latin'],
+    weight: ['600', '700', '800'],
+    variable: '--font-display',
   })
 
   export const metadata = {
@@ -52,7 +59,7 @@
           }}
         />
         </head>
-        <body className={inter.variable}>
+        <body className={`${inter.variable} ${barlowCondensed.variable}`}>
           {children}
           <ServiceWorkerRegister />
         </body>
