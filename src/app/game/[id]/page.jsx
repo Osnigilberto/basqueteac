@@ -96,6 +96,10 @@ export default function GamePage() {
   const [editingTarget, setEditingTarget] = useState(false)
   const [customTargetInput, setCustomTargetInput] = useState('')
 
+  const [editingTeams, setEditingTeams] = useState(false)
+  const [teamANameInput, setTeamANameInput] = useState('')
+  const [teamBNameInput, setTeamBNameInput] = useState('')
+
   useEffect(() => {
     buzzerAudioRef.current = new Audio('/sounds/buzzer.mp3')
     buzzerAudioRef.current.volume = 0.8
@@ -264,6 +268,22 @@ export default function GamePage() {
     setCustomTargetInput('')
   }
 
+  async function handleSaveTeams(e) {
+    if (e) e.preventDefault()
+    const a = teamANameInput.trim() || game?.teamA?.name || 'Time A'
+    const b = teamBNameInput.trim() || game?.teamB?.name || 'Time B'
+    try {
+      await updateDoc(doc(db, 'games', gameId), {
+        'teamA.name': a,
+        'teamB.name': b,
+        updatedAt: serverTimestamp(),
+      })
+      setEditingTeams(false)
+    } catch (err) {
+      console.error('[handleSaveTeams]', err)
+    }
+  }
+
   function setSetupTeam(uid, team) {
     setSetupAssignments((prev) => {
       if (prev[uid] === team) {
@@ -400,6 +420,56 @@ export default function GamePage() {
         </div>
       </section>
 
+      {user && (
+        <div className={styles.editTeamsContainer}>
+          {!editingTeams ? (
+            <button
+              type="button"
+              className={styles.editTeamsBtn}
+              onClick={() => {
+                setTeamANameInput(game.teamA.name || 'Time Branco')
+                setTeamBNameInput(game.teamB.name || 'Time Preto')
+                setEditingTeams(true)
+              }}
+            >
+              <Pencil size={12} />
+              Editar nomes das equipes
+            </button>
+          ) : (
+            <form className={styles.editTeamsForm} onSubmit={handleSaveTeams}>
+              <input
+                type="text"
+                className={styles.editTeamField}
+                value={teamANameInput}
+                onChange={(e) => setTeamANameInput(e.target.value)}
+                placeholder="Equipe 1"
+                required
+              />
+              <span className={styles.editTeamsDivider}>x</span>
+              <input
+                type="text"
+                className={styles.editTeamField}
+                value={teamBNameInput}
+                onChange={(e) => setTeamBNameInput(e.target.value)}
+                placeholder="Equipe 2"
+                required
+              />
+              <button type="submit" className={styles.editTeamsSaveBtn} title="Salvar">
+                <Check size={14} />
+              </button>
+              <button
+                type="button"
+                className={styles.editTeamsCancelBtn}
+                onClick={() => setEditingTeams(false)}
+                title="Cancelar"
+              >
+                <X size={14} />
+              </button>
+            </form>
+          )}
+        </div>
+      )}
+
       {targetReachedTeam && (
         <p className={styles.targetReached}>
           🏆 {targetReachedTeam} atingiu {targetScore} pontos!
@@ -481,7 +551,7 @@ export default function GamePage() {
             DEFINIR TIMES
           </div>
           <p className={styles.setupHint}>
-            Branco {setupTeamACount} · Preto {setupTeamBCount}
+            {game.teamA.name} ({setupTeamACount}) · {game.teamB.name} ({setupTeamBCount})
           </p>
 
           <div className={styles.setupList}>
@@ -509,8 +579,9 @@ export default function GamePage() {
                       setupAssignments[uid] === 'A' ? styles.setupTeamButtonActiveA : ''
                     }`}
                     onClick={() => setSetupTeam(uid, 'A')}
+                    title={game.teamA.name}
                   >
-                    Branco
+                    {game.teamA.name}
                   </button>
                   <button
                     type="button"
@@ -518,8 +589,9 @@ export default function GamePage() {
                       setupAssignments[uid] === 'B' ? styles.setupTeamButtonActiveB : ''
                     }`}
                     onClick={() => setSetupTeam(uid, 'B')}
+                    title={game.teamB.name}
                   >
-                    Preto
+                    {game.teamB.name}
                   </button>
                 </div>
               </div>

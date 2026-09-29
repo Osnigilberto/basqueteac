@@ -40,6 +40,9 @@
     const [players, setPlayers] = useState([])
     const [loadingPlayers, setLoadingPlayers] = useState(true)
 
+    const [teamAName, setTeamAName] = useState('Time Branco')
+    const [teamBName, setTeamBName] = useState('Time Preto')
+
     const [roster, setRoster] = useState({})
 
     const [duelPlayer1, setDuelPlayer1] = useState('')
@@ -81,7 +84,7 @@
         !saving &&
         (gameType === '1v1'
         ? duelPlayer1 && duelPlayer2 && duelPlayer1 !== duelPlayer2
-        : rosterArray.length > 0)
+        : rosterArray.length > 0 && teamAName.trim() && teamBName.trim())
 
     async function handleSubmit(event) {
         event.preventDefault()
@@ -139,8 +142,8 @@
             createdBy: user.uid,
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp(),
-            teamA: { name: 'Time Branco', score: 0, players: [] },
-            teamB: { name: 'Time Preto', score: 0, players: [] },
+            teamA: { name: teamAName.trim() || 'Time Branco', score: 0, players: [] },
+            teamB: { name: teamBName.trim() || 'Time Preto', score: 0, players: [] },
         })
         }
 
@@ -308,6 +311,68 @@
                 </label>
                 </div>
             ) : (
+                <>
+                <div className={styles.field}>
+                    <span className={styles.label}>Nomes das Equipes</span>
+                    <div className={styles.teamsGrid}>
+                    <label className={styles.teamInputGroup}>
+                        <span className={styles.teamBadgeA}>Equipe 1</span>
+                        <input
+                        className={styles.input}
+                        type="text"
+                        value={teamAName}
+                        onChange={(e) => setTeamAName(e.target.value)}
+                        placeholder="Ex: Time Branco, Lakers..."
+                        required
+                        />
+                    </label>
+                    <label className={styles.teamInputGroup}>
+                        <span className={styles.teamBadgeB}>Equipe 2</span>
+                        <input
+                        className={styles.input}
+                        type="text"
+                        value={teamBName}
+                        onChange={(e) => setTeamBName(e.target.value)}
+                        placeholder="Ex: Time Preto, Celtics..."
+                        required
+                        />
+                    </label>
+                    </div>
+                    <div className={styles.presetRow}>
+                    <span className={styles.presetLabel}>Sugestões:</span>
+                    <button
+                        type="button"
+                        className={styles.presetChip}
+                        onClick={() => {
+                        setTeamAName('Time Branco')
+                        setTeamBName('Time Preto')
+                        }}
+                    >
+                        Branco x Preto
+                    </button>
+                    <button
+                        type="button"
+                        className={styles.presetChip}
+                        onClick={() => {
+                        setTeamAName('Time Verde')
+                        setTeamBName('Time Amarelo')
+                        }}
+                    >
+                        Verde x Amarelo
+                    </button>
+                    <button
+                        type="button"
+                        className={styles.presetChip}
+                        onClick={() => {
+                        setTeamAName('Time Azul')
+                        setTeamBName('Time Vermelho')
+                        }}
+                    >
+                        Azul x Vermelho
+                    </button>
+                    </div>
+                </div>
+
                 <div className={styles.field}>
                 <div className={styles.playersHeader}>
                     <span className={styles.label}>Quem vai jogar?</span>
@@ -346,9 +411,10 @@
                 )}
 
                 <p className={styles.targetHint}>
-                    Os times são definidos na hora do jogo — sem time pré-escolhido aqui.
+                    Os atletas confirmados aqui poderão ser distribuídos entre os dois times antes de iniciar o jogo.
                 </p>
                 </div>
+                </>
             )}
 
             <button className={styles.submitButton} type="submit" disabled={!canSubmit}>

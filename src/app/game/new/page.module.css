@@ -326,3 +326,72 @@
     text-align: center;
     flex-shrink: 0;
     }
+
+    .teamsGrid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--spacing-sm);
+    }
+
+    @media (max-width: 480px) {
+    .teamsGrid {
+        grid-template-columns: 1fr;
+    }
+    }
+
+    .teamInputGroup {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+    }
+
+    .teamBadgeA,
+    .teamBadgeB {
+    display: inline-block;
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-bold);
+    padding: 2px 8px;
+    border-radius: var(--radius-sm);
+    width: fit-content;
+    }
+
+    .teamBadgeA {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    color: var(--color-text);
+    }
+
+    .teamBadgeB {
+    background: var(--color-primary);
+    color: #fff;
+    }
+
+    .presetRow {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--spacing-xs);
+    margin-top: var(--spacing-xs);
+    }
+
+    .presetLabel {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-tertiary);
+    }
+
+    .presetChip {
+    padding: 4px var(--spacing-sm);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-full);
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-medium);
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    transition: all 0.15s ease;
+    }
+
+    .presetChip:hover {
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+    }
