@@ -45,7 +45,7 @@ export default function TrainingPage() {
   const [selectedDrill, setSelectedDrill] = useState('three_pointer')
   const [dominantHand, setDominantHand] = useState('right')
   const [targetReps, setTargetReps] = useState(15)
-  const [cameraFacing, setCameraFacing] = useState('user')
+  const [cameraFacing, setCameraFacing] = useState('environment')
 
   const activeDrill = DRILL_TYPES[selectedDrill] || DRILL_TYPES.three_pointer
 
@@ -404,16 +404,20 @@ export default function TrainingPage() {
         </div>
       </header>
 
-      <div className={styles.content}>
-        <div className={styles.titleSection}>
-          <h1 className={styles.title}>Treino de Arremesso</h1>
-          <p className={styles.subtitle}>
-            Calibre a biomecânica do seu arremesso em tempo real usando a câmera do celular.
-          </p>
+      {/* Hero Section (estilo HomeCourt) */}
+      <div className={styles.heroSection}>
+        <div className={styles.heroEyebrow}>
+          <Flame size={14} />
+          Análise de Biomecânica
         </div>
+        <h1 className={styles.heroTitle}>Treino de<br />Arremesso</h1>
+        <p className={styles.heroSubtitle}>
+          Calibre a biomecânica do seu arremesso em tempo real usando a câmera do celular.
+        </p>
+      </div>
 
-        {cameraError && (
-          <div className={styles.tipsCard} style={{ borderColor: 'var(--color-danger)' }}>
+      {cameraError && (
+          <div className={styles.tipsCard} style={{ borderColor: 'var(--color-danger)', margin: '0 var(--spacing-lg)' }}>
             <div className={styles.tipRow}>
               <AlertTriangle size={16} color="var(--color-danger)" />
               <span style={{ color: 'var(--color-danger)' }}>{cameraError}</span>
@@ -421,6 +425,7 @@ export default function TrainingPage() {
           </div>
         )}
 
+      <div className={styles.content}>
         {/* Catálogo de Modalidades de Treino */}
         <section className={styles.card}>
           <div className={styles.cardHeader}>
@@ -430,22 +435,35 @@ export default function TrainingPage() {
           <div className={styles.drillsGrid}>
             {Object.values(DRILL_TYPES).map((drill) => {
               const isSelected = selectedDrill === drill.id
+              const drillEmojis = {
+                three_pointer: '🎯',
+                mid_range: '⚡',
+                layup: '🏀',
+                handles: '🔥',
+                free_throw: '🎖️',
+              }
               return (
                 <button
                   key={drill.id}
                   type="button"
+                  style={{ '--drill-color': drill.color }}
                   className={`${styles.drillCard} ${isSelected ? styles.drillCardActive : ''}`}
                   onClick={() => handleSelectDrill(drill.id)}
                 >
-                  <div className={styles.drillCardHeader}>
-                    <span className={styles.drillTitle}>{drill.title}</span>
-                    <span className={styles.drillBadge} style={{ background: drill.color }}>
-                      {drill.badge}
-                    </span>
+                  <div className={styles.drillIcon} style={{ background: drill.color }}>
+                    {drillEmojis[drill.id] || '🏀'}
                   </div>
-                  <p className={styles.drillDescription}>{drill.description}</p>
-                  <div className={styles.drillMeta}>
-                    <span>Série padrão: {drill.defaultReps} repetições</span>
+                  <div className={styles.drillInfo}>
+                    <div className={styles.drillCardHeader}>
+                      <span className={styles.drillTitle}>{drill.title}</span>
+                      <span className={styles.drillBadge} style={{ background: drill.color }}>
+                        {drill.badge}
+                      </span>
+                    </div>
+                    <p className={styles.drillDescription}>{drill.description}</p>
+                    <div className={styles.drillMeta}>
+                      <span>Série padrão: {drill.defaultReps} repetições</span>
+                    </div>
                   </div>
                 </button>
               )
@@ -558,32 +576,18 @@ export default function TrainingPage() {
           ) : pastSessions.length === 0 ? (
             <p className={styles.subtitle}>Nenhum treino gravado ainda. Seja o primeiro a calibrar!</p>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <div className={styles.historyList}>
               {pastSessions.map((s) => (
-                <div
-                  key={s.id}
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    padding: '10px 14px',
-                    background: 'var(--color-bg)',
-                    borderRadius: 'var(--radius-md)',
-                  }}
-                >
-                  <div>
-                    <strong style={{ fontSize: '14px' }}>{s.totalReps} arremessos</strong>
-                    <div style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>
-                      Mão: {s.dominantHand === 'right' ? 'Destro' : 'Canhoto'} ·{' '}
-                      {s.idealReps || 0} arremessos perfeitos
-                    </div>
+                <div key={s.id} className={styles.historyItem}>
+                  <div className={styles.historyItemLeft}>
+                    <span className={styles.historyItemTitle}>{s.totalReps} arremessos · {s.drillTitle || 'Treino'}</span>
+                    <span className={styles.historyItemSub}>
+                      Mão: {s.dominantHand === 'right' ? 'Destro' : 'Canhoto'} · {s.idealReps || 0} perfeitos
+                    </span>
                   </div>
                   <span
-                    style={{
-                      fontSize: '14px',
-                      fontWeight: '800',
-                      color: s.consistencyScore >= 80 ? 'var(--color-success)' : 'var(--color-primary)',
-                    }}
+                    className={styles.historyScore}
+                    style={{ color: s.consistencyScore >= 80 ? 'var(--color-success)' : 'var(--color-primary)' }}
                   >
                     {s.consistencyScore}%
                   </span>
