@@ -8,7 +8,7 @@
   --t-text-2: rgba(255, 255, 255, 0.62);
   --t-text-3: rgba(255, 255, 255, 0.4);
   --t-accent: #F4541B;
-  --display: var(--font-display), var(--font-family-sans);
+  --display: var(--font-display), 'Arial Narrow', sans-serif;
 
   min-height: 100vh;
   display: flex;
@@ -152,15 +152,15 @@
 
 .drillCard {
   position: relative;
-  flex: 0 0 158px;
-  height: 208px;
+  flex: 0 0 132px;
+  height: 172px;
   scroll-snap-align: start;
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
   align-items: flex-start;
-  gap: 4px;
-  padding: 14px;
+  gap: 3px;
+  padding: 12px;
   text-align: left;
   color: #fff;
   border-radius: 18px;
@@ -185,7 +185,7 @@
   position: absolute;
   top: 10px;
   right: 8px;
-  font-size: 64px;
+  font-size: 44px;
   line-height: 1;
   opacity: 0.9;
   filter: drop-shadow(0 6px 12px rgba(0, 0, 0, 0.35));
@@ -193,9 +193,13 @@
 }
 
 .drillBadge {
-  font-size: 10px;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 9px;
   font-weight: 800;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   padding: 3px 8px;
   border-radius: var(--radius-full);
@@ -205,14 +209,16 @@
 
 .drillTitle {
   font-family: var(--display);
-  font-size: 30px;
+  font-size: 24px;
   font-weight: 800;
   line-height: 0.95;
   text-transform: uppercase;
+  max-width: 100%;
+  overflow-wrap: anywhere;
 }
 
 .drillMeasures {
-  font-size: 11px;
+  font-size: 10px;
   line-height: 1.35;
   color: rgba(255, 255, 255, 0.75);
 }
@@ -242,128 +248,6 @@
   font-size: 14px;
   line-height: 1.5;
   color: var(--t-text-2);
-}
-
-.setupTip {
-  display: flex;
-  gap: 10px;
-  align-items: flex-start;
-  padding: 12px;
-  border-radius: 12px;
-  background: var(--t-surface-2);
-  font-size: 13px;
-  line-height: 1.5;
-  color: var(--t-text-2);
-}
-
-.setupTip svg {
-  flex-shrink: 0;
-  color: var(--drill-color);
-  margin-top: 1px;
-}
-
-.field {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.fieldLabel {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--t-text-3);
-}
-
-.segmented {
-  display: flex;
-  gap: 4px;
-  padding: 4px;
-  border-radius: 12px;
-  background: var(--t-surface-2);
-}
-
-.segmented button {
-  flex: 1;
-  min-height: 40px;
-  border: none;
-  border-radius: 9px;
-  background: transparent;
-  color: var(--t-text-2);
-  font-family: var(--display);
-  font-size: 17px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  transition: background 0.15s ease, color 0.15s ease;
-}
-
-.segmented button:hover {
-  color: #fff;
-}
-
-.segmented .segActive {
-  background: #fff;
-  color: #000;
-}
-
-.segmented .segActive:hover {
-  color: #000;
-}
-
-.coachTip {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 10px 14px;
-  border-left: 3px solid var(--drill-color);
-  border-radius: 0 10px 10px 0;
-  background: var(--t-surface-2);
-  font-size: 13px;
-  line-height: 1.5;
-  color: var(--t-text-2);
-}
-
-.coachTip strong {
-  font-size: 10px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--drill-color);
-}
-
-.startBtn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  min-height: 60px;
-  border: none;
-  border-radius: 14px;
-  background: var(--t-accent);
-  color: #fff;
-  font-family: var(--display);
-  font-size: 26px;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  box-shadow: 0 8px 28px rgba(244, 84, 27, 0.45);
-  transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
-}
-
-.startBtn:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 12px 34px rgba(244, 84, 27, 0.55);
-}
-
-.startBtn:disabled {
-  opacity: 0.55;
-  box-shadow: none;
-  cursor: wait;
-}
-
-.spin {
-  animation: spin 1s linear infinite;
 }
 
 /* ===== HISTÓRICO ===== */
@@ -420,10 +304,6 @@
   font-weight: 800;
 }
 
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
 /* ===== TABLET / DESKTOP ===== */
 @media (min-width: 768px) {
   .hero {
@@ -435,7 +315,127 @@
   }
 
   .drillCard {
-    flex-basis: 180px;
-    height: 230px;
+    flex-basis: 150px;
+    height: 190px;
   }
+}
+
+
+/* ===== ENTRADA DOS DESAFIOS ===== */
+.challengesEntry {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px;
+  border-radius: 18px;
+  color: #fff;
+  background:
+    radial-gradient(ellipse 80% 120% at 100% 0%, rgba(255, 197, 61, 0.28) 0%, transparent 60%),
+    var(--t-surface);
+  border: 1px solid rgba(255, 197, 61, 0.35);
+  transition: transform 0.18s ease, border-color 0.18s ease;
+}
+
+.challengesEntry:hover {
+  transform: translateY(-2px);
+  border-color: #FFC53D;
+}
+
+.entryIcon {
+  flex-shrink: 0;
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #000;
+  background: linear-gradient(145deg, #FFC53D, #CD7F32);
+  box-shadow: 0 6px 20px rgba(255, 197, 61, 0.35);
+}
+
+.entryText {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.entryText strong {
+  font-family: var(--display);
+  font-size: 26px;
+  font-weight: 800;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.entryText span {
+  font-size: 12px;
+  color: var(--t-text-2);
+}
+
+.entryStars {
+  font-family: var(--display);
+  font-size: 22px;
+  font-weight: 800;
+  color: #FFC53D;
+  white-space: nowrap;
+}
+
+.entryStars small {
+  font-size: 14px;
+  color: var(--t-text-3);
+}
+
+.entryChevron {
+  flex-shrink: 0;
+  color: var(--t-text-3);
+}
+
+/* ===== BOX SCORE (3PT 7-10) ===== */
+.boxScore {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 18px;
+}
+
+.zoneLine {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--t-border);
+}
+
+.zoneLine span {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  color: var(--t-accent);
+}
+
+.zoneLine strong {
+  font-family: var(--display);
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.zoneLine em {
+  font-style: normal;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--t-text-2);
+}
+
+.boxScoreHint {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--t-text-3);
+  max-width: 360px;
 }

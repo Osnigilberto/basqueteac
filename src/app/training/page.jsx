@@ -1,16 +1,24 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import Script from 'next/script'
-import { collection, addDoc, getDocs, query, where, serverTimestamp } from 'firebase/firestore'
-import { Flame, Play, Smartphone, Loader2, History } from 'lucide-react'
+import { Flame, History, Trophy, ChevronRight } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
-import { db } from '@/lib/firebase'
 import BottomNav from '@/components/BottomNav/BottomNav'
-import TrainingSession from '@/components/TrainingSession/TrainingSession'
-import TrainingSummary from '@/components/TrainingSummary/TrainingSummary'
-import { DRILL_TYPES, summarizeSession, unlockAudio } from '@/lib/biomechanics'
+import TrainingRunner from '@/components/TrainingRunner/TrainingRunner'
+import TrainingSetup from '@/components/TrainingSetup/TrainingSetup'
+import { DRILL_TYPES, SHOT_ZONES, unlockAudio, formatShotLine, shotPct } from '@/lib/biomechanics'
+import { CHALLENGE_CATEGORIES, TOTAL_STARS, computeProgress } from '@/lib/challenges'
+import {
+  cachedTrainingSessions,
+  cachedTrainingStats,
+  loadTrainingSessions,
+  sessionZone,
+  cachedChallengeBest,
+  loadChallengeBest,
+} from '@/lib/trainingStore'
 import styles from './page.module.css'
 
 const DRILL_EMOJIS = {
@@ -20,15 +28,6 @@ const DRILL_EMOJIS = {
   layup: '🏃',
   handles: '🔥',
   free_throw: '🎖️',
-}
-
-const SETUP_TIPS = {
-  user: 'Câmera frontal: apoie o celular de pé no chão ou numa garrafa, a uns 2 metros, virado para você.',
-  environment: 'Câmera traseira: use um tripé ou apoio a 4–6 metros, de lado para o arremessador, com o corpo inteiro no quadro.',
-}
-
-function historyKey(uid) {
-  return `basqueteac_trainings_${uid}`
 }
 
 function formatDate(seconds) {
@@ -46,17 +45,18 @@ export default function TrainingPage() {
   const [targetReps, setTargetReps] = useState(DRILL_TYPES.free_shooting.defaultReps)
   const [cameraFacing, setCameraFacing] = useState('environment')
   const [aiReady, setAiReady] = useState(false)
+  const [running, setRunning] = useState(false)
+  // Zona escolhida no Arremesso Livre (os outros drills têm zona fixa)
+  const [freeZone, setFreeZone] = useState('2PT')
 
-  // lobby | session | summary
-  const [view, setView] = useState('lobby')
-  const [result, setResult] = useState(null)
-  const [saving, setSaving] = useState(false)
-
-  // Histórico
+  // Histórico e desafios
   const [pastSessions, setPastSessions] = useState([])
+  const [stats, setStats] = useState(null)
   const [loadingHistory, setLoadingHistory] = useState(true)
+  const [challengeBest, setChallengeBest] = useState({})
 
   const activeDrill = DRILL_TYPES[selectedDrill] || DRILL_TYPES.free_shooting
+  const activeZone = activeDrill.mode === 'shooting' ? activeDrill.zone || freeZone : null
 
   function handleSelectDrill(drillId) {
     const d = DRILL_TYPES[drillId]
@@ -70,93 +70,36 @@ export default function TrainingPage() {
     if (!loading && !user) router.push('/')
   }, [loading, user, router])
 
-  // Carrega histórico de treinos do usuário
+  // Carrega histórico e recordes: cache local primeiro, depois Firestore
   useEffect(() => {
     if (!user) return
-    async function loadPastSessions() {
-      // 1. Cache local para resposta imediata
-      try {
-        const local = localStorage.getItem(historyKey(user.uid))
-        if (local) setPastSessions(JSON.parse(local))
-      } catch (e) {
-        // ignore
+    async function load() {
+      setPastSessions(cachedTrainingSessions(user.uid))
+      setStats(cachedTrainingStats(user.uid))
+      setChallengeBest(cachedChallengeBest(user.uid))
+      loadChallengeBest(user.uid).then(setChallengeBest)
+      const history = await loadTrainingSessions(user.uid)
+      if (history) {
+        setPastSessions(history.recent)
+        setStats(history.stats)
       }
-
-      // 2. Firestore (ordenando em memória para evitar exigência de índice composto)
-      try {
-        const q = query(collection(db, 'training_sessions'), where('uid', '==', user.uid))
-        const snap = await getDocs(q)
-        if (!snap.empty) {
-          const sessions = snap.docs.map((d) => ({ id: d.id, ...d.data() }))
-          sessions.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0))
-          const topSessions = sessions.slice(0, 10)
-          setPastSessions(topSessions)
-          try {
-            localStorage.setItem(historyKey(user.uid), JSON.stringify(topSessions))
-          } catch (e) {}
-        }
-      } catch (err) {
-        console.warn('[loadPastSessions]', err?.message)
-      } finally {
-        setLoadingHistory(false)
-      }
+      setLoadingHistory(false)
     }
-    loadPastSessions()
+    load()
   }, [user])
 
   function startSession() {
     unlockAudio()
-    setResult(null)
-    setView('session')
+    setRunning(true)
   }
 
-  function handleSessionFinish(raw) {
-    setResult({ raw, summary: summarizeSession(activeDrill, raw) })
-    setView('summary')
-  }
-
-  // Salva o treino localmente e no Firestore
-  async function saveSession() {
-    if (!user || !result) return
-    setSaving(true)
-
-    const record = {
-      drillId: selectedDrill,
-      drillTitle: activeDrill.title,
-      drillBadge: activeDrill.badge,
-      dominantHand,
-      ...result.summary,
-    }
-
-    try {
-      const current = JSON.parse(localStorage.getItem(historyKey(user.uid)) || '[]')
-      const updated = [
-        { id: 'session-' + Date.now(), ...record, createdAt: { seconds: Math.floor(Date.now() / 1000) } },
-        ...current,
-      ].slice(0, 10)
-      localStorage.setItem(historyKey(user.uid), JSON.stringify(updated))
-      setPastSessions(updated)
-    } catch (e) {}
-
-    try {
-      await addDoc(collection(db, 'training_sessions'), {
-        uid: user.uid,
-        ...record,
-        createdAt: serverTimestamp(),
-      })
-    } catch (err) {
-      console.warn('[saveSession - Firestore permissions]', err?.message)
-    } finally {
-      setSaving(false)
-      setView('lobby')
-    }
-  }
-
-  // Números agregados do histórico
-  const totalReps = pastSessions.reduce((a, s) => a + (s.totalReps || 0), 0)
-  const avgScore = pastSessions.length
-    ? Math.round(pastSessions.reduce((a, s) => a + (s.consistencyScore || 0), 0) / pastSessions.length)
-    : null
+  // Números acumulados de todos os treinos
+  const avgScore = stats?.count ? Math.round(stats.scoreSum / stats.count) : null
+  const zoneLines = SHOT_ZONES.filter((z) => stats?.zones[z.id]?.attempts > 0).map((z) => ({
+    ...z,
+    ...stats.zones[z.id],
+  }))
+  const progress = computeProgress(challengeBest)
 
   return (
     <main className={styles.page}>
@@ -191,11 +134,11 @@ export default function TrainingPage() {
 
           <div className={styles.heroStats}>
             <div>
-              <strong>{pastSessions.length}</strong>
+              <strong>{stats?.count || 0}</strong>
               <span>Treinos</span>
             </div>
             <div>
-              <strong>{totalReps}</strong>
+              <strong>{stats?.reps || 0}</strong>
               <span>Repetições</span>
             </div>
             <div>
@@ -203,13 +146,48 @@ export default function TrainingPage() {
               <span>Consistência</span>
             </div>
           </div>
+
+          {/* Linha estilo box score: 3PT 7-10 · 2PT 4-5 · LL 8-10 */}
+          <div className={styles.boxScore}>
+            {zoneLines.length > 0 ? (
+              zoneLines.map((z) => (
+                <div key={z.id} className={styles.zoneLine}>
+                  <span>{z.id}</span>
+                  <strong>{formatShotLine(z.makes, z.attempts)}</strong>
+                  <em>{shotPct(z.makes, z.attempts)}%</em>
+                </div>
+              ))
+            ) : (
+              <p className={styles.boxScoreHint}>
+                Marque suas cestas no fim de cada treino para ver seu aproveitamento: 3PT, 2PT e lance livre.
+              </p>
+            )}
+          </div>
         </div>
       </section>
 
       <div className={styles.content}>
+        {/* ENTRADA DOS DESAFIOS */}
+        <Link href="/training/challenges" className={styles.challengesEntry}>
+          <span className={styles.entryIcon}>
+            <Trophy size={26} />
+          </span>
+          <span className={styles.entryText}>
+            <strong>Desafios</strong>
+            <span>
+              {CHALLENGE_CATEGORIES.length} fundamentos · metas bronze, prata e ouro
+            </span>
+          </span>
+          <span className={styles.entryStars}>
+            ★ {progress.totalStars}
+            <small>/{TOTAL_STARS}</small>
+          </span>
+          <ChevronRight size={20} className={styles.entryChevron} />
+        </Link>
+
         {/* WORKOUTS */}
         <div className={styles.sectionHead}>
-          <h2>Treinos</h2>
+          <h2>Treino livre</h2>
           <span>{Object.keys(DRILL_TYPES).length} drills</span>
         </div>
         <div className={styles.carousel}>
@@ -237,87 +215,20 @@ export default function TrainingPage() {
             <p>{activeDrill.description}</p>
           </div>
 
-          <div className={styles.setupTip}>
-            <Smartphone size={18} />
-            <span>{SETUP_TIPS[cameraFacing]}</span>
-          </div>
-
-          {activeDrill.mode === 'shooting' && (
-            <div className={styles.field}>
-              <span className={styles.fieldLabel}>Mão de arremesso</span>
-              <div className={styles.segmented}>
-                <button
-                  type="button"
-                  className={dominantHand === 'right' ? styles.segActive : ''}
-                  onClick={() => setDominantHand('right')}
-                >
-                  Direita
-                </button>
-                <button
-                  type="button"
-                  className={dominantHand === 'left' ? styles.segActive : ''}
-                  onClick={() => setDominantHand('left')}
-                >
-                  Esquerda
-                </button>
-              </div>
-            </div>
-          )}
-
-          <div className={styles.field}>
-            <span className={styles.fieldLabel}>{activeDrill.mode === 'targets' ? 'Alvos' : 'Meta de arremessos'}</span>
-            <div className={styles.segmented}>
-              {activeDrill.presetReps.map((r) => (
-                <button key={r} type="button" className={targetReps === r ? styles.segActive : ''} onClick={() => setTargetReps(r)}>
-                  {r}
-                </button>
-              ))}
-              <button
-                type="button"
-                className={targetReps === 'free' ? styles.segActive : ''}
-                onClick={() => setTargetReps('free')}
-              >
-                Livre
-              </button>
-            </div>
-          </div>
-
-          <div className={styles.field}>
-            <span className={styles.fieldLabel}>Câmera</span>
-            <div className={styles.segmented}>
-              <button
-                type="button"
-                className={cameraFacing === 'user' ? styles.segActive : ''}
-                onClick={() => setCameraFacing('user')}
-              >
-                Frontal
-              </button>
-              <button
-                type="button"
-                className={cameraFacing === 'environment' ? styles.segActive : ''}
-                onClick={() => setCameraFacing('environment')}
-              >
-                Traseira
-              </button>
-            </div>
-          </div>
-
-          <div className={styles.coachTip}>
-            <strong>Coach Carter</strong>
-            {activeDrill.targetTip}
-          </div>
-
-          <button type="button" className={styles.startBtn} onClick={startSession} disabled={!aiReady}>
-            {aiReady ? (
-              <>
-                <Play size={20} fill="currentColor" /> Começar
-              </>
-            ) : (
-              <>
-                <Loader2 size={20} className={styles.spin} /> Carregando IA…
-              </>
-            )}
-          </button>
+          <TrainingSetup
+            drill={activeDrill}
+            cameraFacing={cameraFacing}
+            onCameraChange={setCameraFacing}
+            dominantHand={dominantHand}
+            onHandChange={setDominantHand}
+            showHand={activeDrill.mode === 'shooting'}
+            targetReps={targetReps}
+            onRepsChange={setTargetReps}
+            zone={freeZone}
+            onZoneChange={activeDrill.mode === 'shooting' && !activeDrill.zone ? setFreeZone : undefined}
+            aiReady={aiReady}
+            onStart={startSession}
+          />
         </section>
 
         {/* HISTÓRICO */}
@@ -339,8 +250,9 @@ export default function TrainingPage() {
                     ? `Reação ${(s.avgReaction / 1000).toFixed(2)}s`
                     : null
                   : [
+                      s.attempts > 0 &&
+                        `${sessionZone(s) || 'Cestas'} ${formatShotLine(s.makes, s.attempts)}`,
                       s.avgReleaseTime != null && `Soltura ${(s.avgReleaseTime / 1000).toFixed(2)}s`,
-                      s.attempts > 0 && `${s.makes}/${s.attempts} cestas`,
                     ]
                       .filter(Boolean)
                       .join(' · ') || `${s.idealReps || 0} perfeitos`
@@ -349,6 +261,7 @@ export default function TrainingPage() {
                   <span className={styles.historyEmoji}>{DRILL_EMOJIS[s.drillId] || '🏀'}</span>
                   <div className={styles.historyInfo}>
                     <span className={styles.historyTitle}>
+                      {s.challengeTitle ? `🏆 ${s.challengeTitle} · ` : ''}
                       {s.totalReps} {s.mode === 'targets' ? 'alvos' : 'arremessos'} · {drill?.shortTitle || s.drillTitle || 'Treino'}
                     </span>
                     <span className={styles.historySub}>
@@ -369,26 +282,20 @@ export default function TrainingPage() {
         )}
       </div>
 
-      {view === 'session' && (
-        <TrainingSession
+      {running && (
+        <TrainingRunner
+          user={user}
           drill={activeDrill}
           dominantHand={dominantHand}
           targetReps={targetReps}
           cameraFacing={cameraFacing}
-          onFinish={handleSessionFinish}
-          onCancel={() => setView('lobby')}
-        />
-      )}
-
-      {view === 'summary' && result && (
-        <TrainingSummary
-          drill={activeDrill}
-          summary={result.summary}
-          shots={result.raw.shots}
-          hits={result.raw.hits}
-          saving={saving}
-          onSave={saveSession}
-          onDiscard={() => setView('lobby')}
+          zone={activeZone}
+          onSaved={({ history }) => {
+            if (!history) return
+            setPastSessions(history.recent)
+            setStats(history.stats)
+          }}
+          onClose={() => setRunning(false)}
         />
       )}
 

@@ -31,7 +31,7 @@
 }
 
 .title {
-  font-family: var(--font-display), var(--font-family-sans);
+  font-family: var(--font-display), 'Arial Narrow', sans-serif;
   font-size: 44px;
   font-weight: 800;
   line-height: 0.95;
@@ -59,7 +59,7 @@
 }
 
 .heroValue {
-  font-family: var(--font-display), var(--font-family-sans);
+  font-family: var(--font-display), 'Arial Narrow', sans-serif;
   font-size: 64px;
   font-weight: 800;
   line-height: 0.95;
@@ -80,7 +80,7 @@
 }
 
 .sectionTitle {
-  font-family: var(--font-display), var(--font-family-sans);
+  font-family: var(--font-display), 'Arial Narrow', sans-serif;
   font-size: 20px;
   font-weight: 800;
   letter-spacing: 0.06em;
@@ -114,7 +114,7 @@
 }
 
 .tileValue {
-  font-family: var(--font-display), var(--font-family-sans);
+  font-family: var(--font-display), 'Arial Narrow', sans-serif;
   font-size: 36px;
   font-weight: 800;
   line-height: 1;
@@ -222,7 +222,7 @@
 .saveBtn {
   min-height: 54px;
   border-radius: 12px;
-  font-family: var(--font-display), var(--font-family-sans);
+  font-family: var(--font-display), 'Arial Narrow', sans-serif;
   font-size: 20px;
   font-weight: 800;
   letter-spacing: 0.06em;
@@ -253,4 +253,158 @@
 
 @keyframes grow {
   from { transform: scaleY(0); }
+}
+
+/* ===== DESAFIO ===== */
+.challenge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 18px 14px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  text-align: center;
+}
+
+.bigStars {
+  display: flex;
+  gap: 6px;
+  font-size: 52px;
+  line-height: 1;
+  color: rgba(255, 255, 255, 0.15);
+}
+
+.bigStars .starOn {
+  color: var(--star-color);
+  text-shadow: 0 0 24px var(--star-color);
+  animation: starPop 0.45s cubic-bezier(0.2, 1.6, 0.4, 1) both;
+}
+
+.challengeValue {
+  font-family: var(--font-display), 'Arial Narrow', sans-serif;
+  font-size: 48px;
+  font-weight: 800;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.challengeNote {
+  font-size: 13px;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.65);
+  max-width: 300px;
+}
+
+.tierRow {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  width: 100%;
+}
+
+.tierBox {
+  display: flex;
+  flex-direction: column;
+  padding: 8px 4px;
+  border-radius: 10px;
+  border: 1.5px solid rgba(255, 255, 255, 0.12);
+  font-size: 13px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.tierBox span {
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.tierDone {
+  border-color: var(--star-color);
+  color: #fff;
+  background: color-mix(in srgb, var(--star-color) 18%, transparent);
+}
+
+.tierDone span {
+  color: var(--star-color);
+}
+
+.badges {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.badges:empty {
+  display: none;
+}
+
+.badgeRecord,
+.badgeLevel {
+  font-family: var(--font-display), 'Arial Narrow', sans-serif;
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 4px 12px;
+  border-radius: var(--radius-full);
+}
+
+.badgeRecord {
+  background: #FFC53D;
+  color: #000;
+}
+
+.badgeLevel {
+  background: #34C759;
+  color: #000;
+}
+
+@keyframes starPop {
+  from { transform: scale(0) rotate(-40deg); opacity: 0; }
+  to { transform: scale(1) rotate(0); opacity: 1; }
+}
+
+/* ===== MARCAR CESTAS ===== */
+.markHint {
+  font-size: 13px;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.55);
+  margin-top: -8px;
+}
+
+.shotGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(46px, 1fr));
+  gap: 8px;
+}
+
+.shotChip {
+  aspect-ratio: 1;
+  border-radius: 12px;
+  border: 1.5px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.7);
+  font-family: var(--font-display), 'Arial Narrow', sans-serif;
+  font-size: 20px;
+  font-weight: 800;
+  transition: transform 0.1s ease, background 0.15s ease;
+}
+
+.shotChip:active {
+  transform: scale(0.92);
+}
+
+.shotMade {
+  border-color: #34C759;
+  background: rgba(52, 199, 89, 0.25);
+  color: #34C759;
+}
+
+.shotMiss {
+  border-color: rgba(255, 59, 48, 0.5);
+  color: rgba(255, 59, 48, 0.8);
 }

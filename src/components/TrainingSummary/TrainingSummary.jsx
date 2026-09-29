@@ -6,7 +6,10 @@ import {
   evaluateReleaseTime,
   evaluateLegAngle,
   evaluateReleaseAngle,
+  formatShotLine,
+  shotPct,
 } from '@/lib/biomechanics'
+import { formatValue, formatTier, TIER_NAMES, TIER_COLORS } from '@/lib/challenges'
 import styles from './TrainingSummary.module.css'
 
 function formatDuration(ms) {
@@ -18,7 +21,19 @@ function formatDuration(ms) {
  * Tela de resultados no estilo "Shot Science": números grandes, médias da
  * sessão avaliadas por cor e um gráfico por repetição.
  */
-export default function TrainingSummary({ drill, summary, shots, hits, saving, onSave, onDiscard }) {
+export default function TrainingSummary({
+  drill,
+  summary,
+  shots,
+  hits,
+  saving,
+  challengeResult = null,
+  zone = null,
+  onToggleShot,
+  onSave,
+  onDiscard,
+  onRetry,
+}) {
   const isTargets = summary.mode === 'targets'
   const score = summary.consistencyScore
   const quote = score >= 80 ? drill.quotes.high : score >= 55 ? drill.quotes.mid : drill.quotes.low
@@ -71,10 +86,12 @@ export default function TrainingSummary({ drill, summary, shots, hits, saving, o
     <div className={styles.wrapper} style={{ '--drill-color': drill.color }}>
       <div className={styles.inner}>
         <div className={styles.eyebrow}>
-          <Award size={16} /> Treino concluído
+          <Award size={16} /> {challengeResult ? 'Desafio concluído' : 'Treino concluído'}
         </div>
-        <h2 className={styles.title}>{drill.title}</h2>
+        <h2 className={styles.title}>{challengeResult ? challengeResult.challenge.title : drill.title}</h2>
         <div className={styles.meta}>{formatDuration(summary.durationMs)} de treino</div>
+
+        {challengeResult && <ChallengeBanner result={challengeResult} />}
 
         <div className={styles.hero}>
           <div className={styles.heroStat}>
@@ -91,15 +108,37 @@ export default function TrainingSummary({ drill, summary, shots, hits, saving, o
           {!isTargets && summary.attempts > 0 && (
             <div className={styles.heroStat}>
               <span className={styles.heroValue}>
-                {Math.round((summary.makes / summary.attempts) * 100)}
-                <small>%</small>
+                {formatShotLine(summary.makes, summary.attempts)}
               </span>
               <span className={styles.heroLabel}>
-                Aproveit. {summary.makes}/{summary.attempts}
+                {zone || 'Cestas'} · {shotPct(summary.makes, summary.attempts)}%
               </span>
             </div>
           )}
         </div>
+
+        {!isTargets && shots.length > 0 && onToggleShot && (
+          <>
+            <div className={styles.sectionTitle}>Cestas{zone ? ` · ${zone}` : ''}</div>
+            <p className={styles.markHint}>
+              Toque nos arremessos que caíram. Os que não forem marcados contam como erro.
+            </p>
+            <div className={styles.shotGrid}>
+              {shots.map((s, i) => (
+                <button
+                  key={s.id}
+                  type="button"
+                  className={`${styles.shotChip} ${s.made ? styles.shotMade : s.made === false ? styles.shotMiss : ''}`}
+                  onClick={() => onToggleShot(s.id)}
+                  aria-pressed={!!s.made}
+                  aria-label={`Arremesso ${i + 1}: ${s.made ? 'cesta' : 'erro'}`}
+                >
+                  {s.made ? '✓' : i + 1}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
 
         <div className={styles.sectionTitle}>{isTargets ? 'Desempenho' : 'Shot Science'}</div>
         <div className={styles.tiles}>
@@ -151,13 +190,64 @@ export default function TrainingSummary({ drill, summary, shots, hits, saving, o
         </blockquote>
 
         <div className={styles.actions}>
-          <button type="button" className={styles.discardBtn} onClick={onDiscard} disabled={saving}>
-            Descartar
-          </button>
+          {challengeResult ? (
+            <button type="button" className={styles.discardBtn} onClick={onRetry} disabled={saving}>
+              Tentar de novo
+            </button>
+          ) : (
+            <button type="button" className={styles.discardBtn} onClick={onDiscard} disabled={saving}>
+              Descartar
+            </button>
+          )}
           <button type="button" className={styles.saveBtn} onClick={onSave} disabled={saving || summary.totalReps === 0}>
             {saving ? 'Salvando…' : 'Salvar treino'}
           </button>
         </div>
+      </div>
+    </div>
+  )
+}
+
+function ChallengeBanner({ result }) {
+  const { challenge, value, stars, incomplete, isRecord, unlocked } = result
+  return (
+    <div className={styles.challenge}>
+      <div className={styles.bigStars}>
+        {[0, 1, 2].map((i) => (
+          <span
+            key={i}
+            className={i < stars ? styles.starOn : ''}
+            style={{ '--star-color': TIER_COLORS[i], animationDelay: `${0.25 + i * 0.3}s` }}
+          >
+            ★
+          </span>
+        ))}
+      </div>
+
+      <div className={styles.challengeValue}>{formatValue(challenge, value)}</div>
+
+      {incomplete ? (
+        <p className={styles.challengeNote}>
+          Desafio incompleto: faltaram repetições para valer estrelas. Tente de novo até o fim!
+        </p>
+      ) : (
+        <div className={styles.tierRow}>
+          {challenge.tiers.map((t, i) => (
+            <div
+              key={TIER_NAMES[i]}
+              className={`${styles.tierBox} ${i < stars ? styles.tierDone : ''}`}
+              style={{ '--star-color': TIER_COLORS[i] }}
+            >
+              <span>{TIER_NAMES[i]}</span>
+              {formatTier(challenge, t)}
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className={styles.badges}>
+        {isRecord && <span className={styles.badgeRecord}>Novo recorde!</span>}
+        {unlocked && <span className={styles.badgeLevel}>Liberou: {unlocked.title}!</span>}
       </div>
     </div>
   )

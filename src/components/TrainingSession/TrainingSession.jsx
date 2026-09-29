@@ -4,6 +4,10 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { X, Check, Timer } from 'lucide-react'
 import {
   LANDMARK_INDEXES,
+  HAND_LANDMARKS,
+  offHand,
+  isCleanShot,
+  summarizeSession,
   createShotTracker,
   createTargetGame,
   evaluateElbowAngle,
@@ -14,8 +18,11 @@ import {
   playSuccessBeep,
   playWarningBeep,
   playCountdownBeep,
+  formatShotLine,
+  shotPct,
 } from '@/lib/biomechanics'
 import { drawSkeleton, drawAngle, drawTarget, drawBurst } from '@/lib/poseOverlay'
+import { metricOf, starsFor, formatTier, formatValue, TIER_NAMES, TIER_COLORS } from '@/lib/challenges'
 import styles from './TrainingSession.module.css'
 
 const READY_HOLD_MS = 800
@@ -35,10 +42,23 @@ function requiredLandmarks(drill, hand) {
 /**
  * Sessão de treino ao vivo em tela cheia: câmera + MediaPipe Pose + HUD.
  * Etapas: loading -> positioning (enquadrar o corpo) -> countdown -> active
+ *
+ * `challenge` (opcional) aplica as regras de um desafio: tempo limite,
+ * encerrar ao errar, mão fraca etc. — ver src/lib/challenges.js
  */
-export default function TrainingSession({ drill, dominantHand, targetReps, cameraFacing, onFinish, onCancel }) {
+export default function TrainingSession({
+  drill,
+  dominantHand,
+  targetReps,
+  cameraFacing,
+  challenge = null,
+  zone = null,
+  onFinish,
+  onCancel,
+}) {
   const mirrored = cameraFacing === 'user'
   const isTargets = drill.mode === 'targets'
+  const rules = challenge?.rules || {}
 
   const [stage, setStage] = useState('loading')
   const [error, setError] = useState(null)
@@ -67,6 +87,7 @@ export default function TrainingSession({ drill, dominantHand, targetReps, camer
   const trackerRef = useRef(null)
   const gameRef = useRef(null)
   const onFinishRef = useRef(onFinish)
+  const lastBeepSecRef = useRef(null)
 
   function goTo(next) {
     stageRef.current = next
@@ -88,7 +109,9 @@ export default function TrainingSession({ drill, dominantHand, targetReps, camer
     })
     later(() => {
       trackerRef.current = createShotTracker({ hand: dominantHand })
-      gameRef.current = createTargetGame()
+      gameRef.current = createTargetGame({
+        hands: rules.hand === 'off' ? HAND_LANDMARKS[offHand(dominantHand)] : HAND_LANDMARKS.both,
+      })
       startAtRef.current = performance.now()
       goTo('active')
     }, 3 * 800 + 500)
@@ -104,6 +127,10 @@ export default function TrainingSession({ drill, dominantHand, targetReps, camer
       misses: missesRef.current,
       durationMs,
     })
+  }
+
+  function reachedReps(n) {
+    return targetReps !== 'free' && n >= targetReps
   }
 
   function tagLastShot(made) {
@@ -169,12 +196,13 @@ export default function TrainingSession({ drill, dominantHand, targetReps, camer
         burstsRef.current.push(r.hit)
         setHits(hitsRef.current)
         playSuccessBeep()
-        if (targetReps !== 'free' && hitsRef.current.length >= targetReps) later(finish, 500)
+        if (reachedReps(hitsRef.current.length)) later(finish, 500)
       }
       if (r.miss) {
         missesRef.current += 1
         setMisses(missesRef.current)
         playWarningBeep()
+        if (rules.endOnMiss) later(finish, 400)
       }
       burstsRef.current = burstsRef.current.filter((b) => drawBurst(ctx, b, t, w, h, mirrored))
       return
@@ -200,8 +228,13 @@ export default function TrainingSession({ drill, dominantHand, targetReps, camer
     if (r.released) {
       shotsRef.current = [...shotsRef.current, r.released]
       setShots(shotsRef.current)
-      playSuccessBeep()
-      if (targetReps !== 'free' && shotsRef.current.length >= targetReps) later(finish, 700)
+      if (rules.endOnBadShot && !isCleanShot(r.released)) {
+        playWarningBeep()
+        later(finish, 700)
+      } else {
+        playSuccessBeep()
+        if (reachedReps(shotsRef.current.length)) later(finish, 700)
+      }
     }
     if (r.completed) {
       shotsRef.current = shotsRef.current.map((s) => (s.id === r.completed.id ? { ...s, jump: r.completed.jump } : s))
@@ -298,19 +331,50 @@ export default function TrainingSession({ drill, dominantHand, targetReps, camer
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Cronômetro
+  // Cronômetro (regressivo quando o desafio tem tempo limite)
   useEffect(() => {
     if (stage !== 'active') return
-    const id = setInterval(() => setElapsed(performance.now() - startAtRef.current), 250)
+    const id = setInterval(() => {
+      const now = performance.now() - startAtRef.current
+      setElapsed(now)
+      if (!rules.timeLimitMs) return
+      const left = Math.ceil((rules.timeLimitMs - now) / 1000)
+      if (left <= 5 && left > 0 && lastBeepSecRef.current !== left) {
+        lastBeepSecRef.current = left
+        playCountdownBeep(false)
+      }
+      if (now >= rules.timeLimitMs) {
+        playCountdownBeep(true)
+        finish()
+      }
+    }, 100)
     return () => clearInterval(id)
+    // finish/rules são estáveis durante a sessão
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stage])
 
   const reps = isTargets ? hits.length : shots.length
   const lastShot = shots[shots.length - 1]
-  const tagged = shots.filter((s) => s.made != null)
-  const makes = tagged.filter((s) => s.made).length
+  const anyMarked = shots.some((s) => s.made != null)
+  const makes = shots.filter((s) => s.made).length
   const lastHit = hits[hits.length - 1]
   const avgReaction = hits.length ? Math.round(hits.reduce((a, h) => a + h.reaction, 0) / hits.length) : null
+
+  // Progresso ao vivo do desafio: estrelas já garantidas e próxima meta
+  let goal = null
+  if (challenge && stage === 'active') {
+    const liveValue = metricOf(challenge).get(summarizeSession(drill, { shots, hits, misses, durationMs: elapsed }))
+    const hasValue = liveValue != null && (isTargets ? hits.length : shots.length) > 0
+    const stars = hasValue ? starsFor(challenge, liveValue) : 0
+    goal = {
+      stars,
+      value: hasValue ? formatValue(challenge, liveValue) : '--',
+      next: stars < 3 ? `${TIER_NAMES[stars]} ${formatTier(challenge, challenge.tiers[stars])}` : 'Ouro garantido!',
+      color: stars > 0 ? TIER_COLORS[stars - 1] : 'rgba(255,255,255,0.4)',
+    }
+  }
+
+  const timeLeft = rules.timeLimitMs ? Math.max(0, rules.timeLimitMs - (stage === 'active' ? elapsed : 0)) : null
 
   const phaseLabel =
     live.phase === 'SET_POINT' ? 'SET POINT' : live.phase === 'RELEASE' ? 'SOLTURA!' : 'PRONTO'
@@ -341,9 +405,9 @@ export default function TrainingSession({ drill, dominantHand, targetReps, camer
           <span className={styles.liveDot} />
           {drill.shortTitle}
         </div>
-        <div className={styles.clock}>
+        <div className={`${styles.clock} ${timeLeft != null && timeLeft <= 5000 && stage === 'active' ? styles.clockUrgent : ''}`}>
           <Timer size={14} />
-          {formatClock(stage === 'active' ? elapsed : 0)}
+          {timeLeft != null ? formatClock(timeLeft + 999) : formatClock(stage === 'active' ? elapsed : 0)}
         </div>
       </header>
 
@@ -355,9 +419,10 @@ export default function TrainingSession({ drill, dominantHand, targetReps, camer
             {String(reps).padStart(2, '0')}
             {targetReps !== 'free' && <span className={styles.scoreTotal}>/{targetReps}</span>}
           </div>
-          {!isTargets && tagged.length > 0 && (
+          {!isTargets && anyMarked && (
             <div className={styles.scoreSub}>
-              {makes}/{tagged.length} cestas · {Math.round((makes / tagged.length) * 100)}%
+              {zone ? `${zone} ` : ''}
+              {formatShotLine(makes, shots.length)} · {shotPct(makes, shots.length)}%
             </div>
           )}
           {isTargets && misses > 0 && <div className={styles.scoreSub}>{misses} perdidos</div>}
@@ -431,6 +496,20 @@ export default function TrainingSession({ drill, dominantHand, targetReps, camer
       {/* HUD inferior */}
       {stage === 'active' && (
         <div className={styles.bottom}>
+          {goal && (
+            <div className={styles.goalChip} style={{ '--goal-color': goal.color }}>
+              <span className={styles.goalStars}>
+                {[0, 1, 2].map((i) => (
+                  <span key={i} style={{ color: i < goal.stars ? TIER_COLORS[i] : undefined }}>
+                    ★
+                  </span>
+                ))}
+              </span>
+              <span className={styles.goalText}>
+                <strong>{goal.value}</strong> · {goal.next}
+              </span>
+            </div>
+          )}
           {isTargets ? (
             <div className={styles.metrics}>
               <Metric label="Última" value={lastHit ? (lastHit.reaction / 1000).toFixed(2) : '--'} unit="s" color="#3B82F6" />

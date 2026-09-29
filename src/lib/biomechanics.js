@@ -5,6 +5,7 @@
  *
  * mode:   'shooting' usa o rastreador de arremesso (Shot Science)
  *         'targets'  usa o jogo de alvos em realidade aumentada (drible)
+ * zone:   zona da linha de arremessos (3PT, 2PT ou LL); sem zona, o atleta escolhe
  * camera: câmera sugerida para o drill (o usuário pode trocar)
  */
 export const DRILL_TYPES = {
@@ -14,7 +15,7 @@ export const DRILL_TYPES = {
     camera: 'environment',
     title: 'Arremesso Livre',
     shortTitle: 'Livre',
-    badge: 'Qualquer Posição',
+    badge: 'Any Spot',
     color: '#14B8A6',
     description: 'Arremesse de onde quiser, no seu ritmo. A IA mede cada bola, não importa a distância.',
     targetTip: 'Varie as posições à vontade, mas repita sempre a mesma mecânica: dip, set point e extensão completa.',
@@ -30,6 +31,7 @@ export const DRILL_TYPES = {
   three_pointer: {
     id: 'three_pointer',
     mode: 'shooting',
+    zone: '3PT',
     camera: 'environment',
     title: 'Arremesso de 3 Pontos',
     shortTitle: '3 Pontos',
@@ -49,6 +51,7 @@ export const DRILL_TYPES = {
   mid_range: {
     id: 'mid_range',
     mode: 'shooting',
+    zone: '2PT',
     camera: 'environment',
     title: 'Mid-Range (Meia Distância)',
     shortTitle: 'Mid-Range',
@@ -68,6 +71,7 @@ export const DRILL_TYPES = {
   layup: {
     id: 'layup',
     mode: 'shooting',
+    zone: '2PT',
     camera: 'environment',
     title: 'Bandeja & Passada',
     shortTitle: 'Bandeja',
@@ -106,6 +110,7 @@ export const DRILL_TYPES = {
   free_throw: {
     id: 'free_throw',
     mode: 'shooting',
+    zone: 'LL',
     camera: 'environment',
     title: 'Lance Livre',
     shortTitle: 'Lance Livre',
@@ -383,7 +388,18 @@ const TARGET_TIMEOUT = 4000
  * Jogo de alvos: um alvo por vez aparece ao alcance das mãos do atleta;
  * acertar com qualquer pulso conta o tempo de reação.
  */
-export function createTargetGame() {
+export const HAND_LANDMARKS = {
+  left: [15, 19],
+  right: [16, 20],
+  both: [15, 16, 19, 20],
+}
+
+/** Mão oposta à dominante — usada nos desafios de mão fraca */
+export function offHand(hand) {
+  return hand === 'left' ? 'right' : 'left'
+}
+
+export function createTargetGame({ hands = HAND_LANDMARKS.both } = {}) {
   let target = null
   let lastEventAt = 0
   let side = Math.random() < 0.5 ? -1 : 1
@@ -418,7 +434,7 @@ export function createTargetGame() {
       return result
     }
 
-    for (const i of [15, 16, 19, 20]) {
+    for (const i of hands) {
       const p = lm[i]
       if (!isVisible(p)) continue
       const d = Math.hypot((p.x - target.x) * aspect, p.y - target.y)
@@ -453,6 +469,22 @@ function avg(values) {
   return v.length ? Math.round(v.reduce((a, b) => a + b, 0) / v.length) : null
 }
 
+function pctIdeal(shots, pick, evaluate) {
+  if (!shots.length) return 0
+  const ideal = shots.filter((s) => pick(s) != null && evaluate(pick(s)).status === 'ideal').length
+  return Math.round((ideal / shots.length) * 100)
+}
+
+/** Arremesso com mecânica limpa: cotovelo no set point e arco de soltura ideais */
+export function isCleanShot(shot) {
+  return (
+    shot.elbowAngle != null &&
+    evaluateElbowAngle(shot.elbowAngle).status === 'ideal' &&
+    shot.releaseAngle != null &&
+    evaluateReleaseAngle(shot.releaseAngle).status === 'ideal'
+  )
+}
+
 export function summarizeSession(drill, { shots = [], hits = [], misses = 0, durationMs = 0 }) {
   if (drill.mode === 'targets') {
     const reactions = hits.map((h) => h.reaction)
@@ -469,20 +501,27 @@ export function summarizeSession(drill, { shots = [], hits = [], misses = 0, dur
   }
 
   const ideal = shots.filter((s) => s.elbowAngle != null && evaluateElbowAngle(s.elbowAngle).status === 'ideal').length
-  const tagged = shots.filter((s) => s.made != null)
+  // Basta marcar um arremesso para a série valer: os não marcados contam como erro
+  const marked = shots.some((s) => s.made != null)
   const jumps = shots.map((s) => s.jump).filter((j) => j != null)
+  // arremessos com mecânica limpa seguidos, a partir do primeiro
+  const firstBad = shots.findIndex((s) => !isCleanShot(s))
   return {
     mode: 'shooting',
     totalReps: shots.length,
     idealReps: ideal,
     consistencyScore: shots.length ? Math.round((ideal / shots.length) * 100) : 0,
-    makes: tagged.filter((s) => s.made).length,
-    attempts: tagged.length,
+    makes: shots.filter((s) => s.made).length,
+    attempts: marked ? shots.length : 0,
     avgReleaseTime: avg(shots.map((s) => s.releaseTime)),
     avgLegAngle: avg(shots.map((s) => s.legAngle)),
     avgReleaseAngle: avg(shots.map((s) => s.releaseAngle)),
     avgElbowAngle: avg(shots.map((s) => s.elbowAngle)),
     maxJump: jumps.length ? Math.max(...jumps) : null,
+    avgJump: avg(jumps),
+    releaseIdealPct: pctIdeal(shots, (s) => s.releaseAngle, evaluateReleaseAngle),
+    legIdealPct: pctIdeal(shots, (s) => s.legAngle, evaluateLegAngle),
+    cleanStreak: firstBad === -1 ? shots.length : firstBad,
     durationMs,
   }
 }
@@ -543,4 +582,23 @@ export function playCountdownBeep(final = false) {
 /** Destrava o áudio no gesto do usuário (iOS exige) */
 export function unlockAudio() {
   getAudioContext()
+}
+
+/* ==========================================================
+   ZONAS DE ARREMESSO (linha estilo box score: 3PT 7-10)
+   ========================================================== */
+
+export const SHOT_ZONES = [
+  { id: '3PT', label: '3 pontos' },
+  { id: '2PT', label: '2 pontos' },
+  { id: 'LL', label: 'Lance livre' },
+]
+
+/** "7-10" */
+export function formatShotLine(makes, attempts) {
+  return `${makes}-${attempts}`
+}
+
+export function shotPct(makes, attempts) {
+  return attempts ? Math.round((makes / attempts) * 100) : 0
 }

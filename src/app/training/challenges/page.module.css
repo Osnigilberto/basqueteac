@@ -1,0 +1,400 @@
+/* Mesmo visual escuro da aba Treinos */
+.page {
+  --t-bg: #0A0A0B;
+  --t-surface: #151517;
+  --t-surface-2: #1E1E21;
+  --t-border: rgba(255, 255, 255, 0.09);
+  --t-text: #FFFFFF;
+  --t-text-2: rgba(255, 255, 255, 0.62);
+  --t-text-3: rgba(255, 255, 255, 0.4);
+  --display: var(--font-display), 'Arial Narrow', sans-serif;
+
+  min-height: 100vh;
+  padding-bottom: 96px;
+  background:
+    radial-gradient(ellipse 100% 40% at 50% 0%, rgba(255, 197, 61, 0.14) 0%, transparent 70%),
+    var(--t-bg);
+  color: var(--t-text);
+}
+
+/* ===== CABEÇALHO ===== */
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: max(env(safe-area-inset-top), 14px) 16px 12px;
+  background: rgba(10, 10, 11, 0.85);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--t-border);
+}
+
+.back {
+  width: 38px;
+  height: 38px;
+  border-radius: var(--radius-full);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  background: var(--t-surface-2);
+}
+
+.header h1 {
+  flex: 1;
+  font-family: var(--display);
+  font-size: 30px;
+  font-weight: 800;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.totalStars {
+  font-family: var(--display);
+  font-size: 22px;
+  font-weight: 800;
+  color: #FFC53D;
+}
+
+.totalStars small {
+  font-size: 14px;
+  color: var(--t-text-3);
+}
+
+/* ===== ABAS ===== */
+.tabs {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 14px 16px 4px;
+  scrollbar-width: none;
+  max-width: 680px;
+  margin: 0 auto;
+}
+
+.tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.tab {
+  flex: 0 0 auto;
+  display: grid;
+  grid-template-columns: auto auto;
+  grid-template-rows: auto auto;
+  column-gap: 8px;
+  align-items: center;
+  padding: 8px 14px 8px 10px;
+  border-radius: 14px;
+  border: 1.5px solid var(--t-border);
+  background: var(--t-surface);
+  color: var(--t-text-2);
+  text-align: left;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.tabActive {
+  color: #fff;
+  border-color: var(--cat-color);
+  background: color-mix(in srgb, var(--cat-color) 22%, var(--t-surface));
+}
+
+.tabIcon {
+  grid-row: span 2;
+  font-size: 22px;
+}
+
+.tabTitle {
+  font-family: var(--display);
+  font-size: 17px;
+  font-weight: 800;
+  line-height: 1;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.tabStars {
+  font-size: 11px;
+  font-weight: 700;
+  color: #FFC53D;
+}
+
+/* ===== CONTEÚDO ===== */
+.content {
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 12px 16px 24px;
+}
+
+.catHead {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
+.catHead p {
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--t-text-2);
+}
+
+.catBar {
+  height: 6px;
+  border-radius: var(--radius-full);
+  background: var(--t-surface-2);
+  overflow: hidden;
+}
+
+.catBar div {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #CD7F32, #FFC53D);
+  transition: width 0.4s ease;
+}
+
+.catHint {
+  font-size: 12px;
+  color: var(--t-text-3);
+}
+
+/* ===== TRILHA ===== */
+.trail {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  position: relative;
+}
+
+/* linha que liga os níveis */
+.trail::before {
+  content: '';
+  position: absolute;
+  left: 35px;
+  top: 30px;
+  bottom: 30px;
+  width: 2px;
+  background: var(--t-border);
+}
+
+.trailItem {
+  position: relative;
+}
+
+.step {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px 12px 12px;
+  border-radius: 16px;
+  border: 1.5px solid var(--t-border);
+  background: var(--t-surface);
+  color: #fff;
+  text-align: left;
+  transition: transform 0.15s ease, border-color 0.15s ease;
+}
+
+.step:hover:not(:disabled) {
+  transform: translateX(3px);
+  border-color: var(--cat-color);
+}
+
+.step:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.stepNext {
+  border-color: var(--cat-color);
+  box-shadow: 0 0 0 1px var(--cat-color), 0 8px 24px color-mix(in srgb, var(--cat-color) 30%, transparent);
+}
+
+.stepNode {
+  position: relative;
+  z-index: 1;
+  flex-shrink: 0;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  color: var(--t-text-2);
+  background: var(--t-surface-2);
+  border: 2px solid color-mix(in srgb, var(--cat-color) 60%, transparent);
+}
+
+.stepBody {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.stepLevel {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--t-text-3);
+}
+
+.stepLevel em {
+  font-style: normal;
+  padding: 1px 6px;
+  border-radius: var(--radius-full);
+  background: var(--cat-color);
+  color: #000;
+}
+
+.stepTitle {
+  font-family: var(--display);
+  font-size: 21px;
+  font-weight: 800;
+  line-height: 1.05;
+  text-transform: uppercase;
+}
+
+.stepMeta {
+  font-size: 12px;
+  color: var(--t-text-3);
+}
+
+.stars {
+  flex-shrink: 0;
+  letter-spacing: 1px;
+  color: rgba(255, 255, 255, 0.2);
+  line-height: 1;
+}
+
+/* ===== PAINEL INFERIOR ===== */
+.sheetBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 900;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  animation: fadeIn 0.2s ease-out;
+}
+
+.sheet {
+  position: relative;
+  width: 100%;
+  max-width: 560px;
+  max-height: 88vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 22px 16px max(env(safe-area-inset-bottom), 20px);
+  border-radius: 22px 22px 0 0;
+  background: var(--t-surface);
+  border-top: 3px solid var(--drill-color);
+  animation: slideUp 0.28s cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+
+.sheetClose {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  background: var(--t-surface-2);
+}
+
+.sheetHead h2 {
+  font-family: var(--display);
+  font-size: 30px;
+  font-weight: 800;
+  line-height: 1;
+  text-transform: uppercase;
+  margin: 4px 40px 6px 0;
+}
+
+.sheetHead p {
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--t-text-2);
+}
+
+.sheetEyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #FFC53D;
+}
+
+.tierRow {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+
+.tierBox {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px 4px;
+  border-radius: 10px;
+  border: 1.5px solid var(--t-border);
+  background: var(--t-surface-2);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--t-text-2);
+  text-align: center;
+}
+
+.tierBox span {
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--tier-color);
+}
+
+.tierDone {
+  border-color: var(--tier-color);
+  color: #fff;
+  background: color-mix(in srgb, var(--tier-color) 16%, transparent);
+}
+
+.recordLine {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 13px;
+  color: var(--t-text-2);
+}
+
+.recordLine strong {
+  color: #fff;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+}
+
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+}

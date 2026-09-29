@@ -1,0 +1,124 @@
+/* Usa os tokens escuros (--t-*) definidos pela página que o contém */
+
+.setupTip {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 12px;
+  border-radius: 12px;
+  background: var(--t-surface-2);
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--t-text-2);
+}
+
+.setupTip svg {
+  flex-shrink: 0;
+  color: var(--drill-color);
+  margin-top: 1px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.fieldLabel {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--t-text-3);
+}
+
+.segmented {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 12px;
+  background: var(--t-surface-2);
+}
+
+.segmented button {
+  flex: 1;
+  min-height: 40px;
+  border: none;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--t-text-2);
+  font-family: var(--font-display), 'Arial Narrow', sans-serif;
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.segmented button:hover {
+  color: #fff;
+}
+
+.segmented .segActive,
+.segmented .segActive:hover {
+  background: #fff;
+  color: #000;
+}
+
+.coachTip {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 14px;
+  border-left: 3px solid var(--drill-color);
+  border-radius: 0 10px 10px 0;
+  background: var(--t-surface-2);
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--t-text-2);
+}
+
+.coachTip strong {
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--drill-color);
+}
+
+.startBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 60px;
+  border: none;
+  border-radius: 14px;
+  background: #F4541B;
+  color: #fff;
+  font-family: var(--font-display), 'Arial Narrow', sans-serif;
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  box-shadow: 0 8px 28px rgba(244, 84, 27, 0.45);
+  transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
+}
+
+.startBtn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 34px rgba(244, 84, 27, 0.55);
+}
+
+.startBtn:disabled {
+  opacity: 0.55;
+  box-shadow: none;
+  cursor: wait;
+}
+
+.spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
