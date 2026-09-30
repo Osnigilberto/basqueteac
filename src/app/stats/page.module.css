@@ -121,6 +121,11 @@
     gap: var(--spacing-sm);
     padding: var(--spacing-sm) 0;
     border-top: 1px solid var(--color-border);
+    color: inherit;
+    }
+
+    .gameLogRow:hover .gameLogOpponent {
+    color: var(--color-primary);
     }
 
     .gameLogRow:first-child {
@@ -182,136 +187,77 @@
     }
     }
 
-    .periodToggle {
+
+    /* ===== ABAS ===== */
+    .tabs {
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 2px;
-    padding: 3px;
-    background: var(--color-bg-secondary);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-lg);
+    grid-template-columns: repeat(3, 1fr);
+    border-bottom: 1px solid var(--color-border);
     }
 
-    .periodButton {
+    .tab {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: var(--spacing-sm) 0 var(--spacing-md);
     border: none;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
     background: transparent;
     color: var(--color-text-secondary);
     font-size: var(--font-size-sm);
-    font-weight: var(--font-weight-semibold);
-    padding: var(--spacing-sm) 0;
+    font-weight: var(--font-weight-bold);
+    cursor: pointer;
+    }
+
+    .tabActive {
+    color: var(--color-primary);
+    border-bottom-color: var(--color-primary);
+    }
+
+    /* ===== HISTÓRICO ===== */
+    .resultWin,
+    .resultLoss,
+    .mvpTag {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 0 5px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: var(--font-weight-bold);
+    line-height: 16px;
+    }
+
+    .resultWin {
+    color: var(--color-success);
+    background: color-mix(in srgb, var(--color-success) 15%, transparent);
+    }
+
+    .resultLoss {
+    color: var(--color-danger);
+    background: color-mix(in srgb, var(--color-danger) 15%, transparent);
+    }
+
+    .mvpTag {
+    color: var(--color-primary);
+    background: color-mix(in srgb, var(--color-primary) 15%, transparent);
+    }
+
+    .gameLogChevron {
+    align-self: center;
+    margin-left: auto;
+    color: var(--color-text-tertiary);
+    flex-shrink: 0;
+    }
+
+    .mvpBanner {
+    margin-bottom: var(--spacing-md);
+    padding: var(--spacing-sm) var(--spacing-md);
+    background: color-mix(in srgb, var(--color-primary) 12%, transparent);
+    border: 1px solid var(--color-primary);
     border-radius: var(--radius-md);
-    cursor: pointer;
-    }
-
-    .periodButtonActive {
-    background: var(--color-primary);
-    color: var(--color-text-on-primary, #fff);
-    }
-
-    .periodNav {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: var(--spacing-md);
-    padding: var(--spacing-xs) 0;
-    }
-
-    .periodNavButton {
-    width: 32px;
-    height: 32px;
-    border-radius: 50%;
-    border: 1px solid var(--color-border);
-    background: transparent;
-    color: var(--color-text-secondary);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    }
-
-    .periodNavButton:hover:not(:disabled) {
-    border-color: var(--color-primary);
-    color: var(--color-primary);
-    }
-
-    .periodNavButton:disabled {
-    opacity: 0.35;
-    cursor: not-allowed;
-    }
-
-    .periodNavLabel {
-    min-width: 140px;
-    text-align: center;
     font-size: var(--font-size-sm);
     font-weight: var(--font-weight-semibold);
     color: var(--color-text);
-    }
-
-    .rankingGrid {
-    display: flex;
-    flex-direction: column;
-    gap: var(--spacing-lg);
-    }
-
-    .rankingCategory {
-    display: flex;
-    flex-direction: column;
-    gap: var(--spacing-xs);
-    }
-
-    .rankingCategoryLabel {
-    font-size: var(--font-size-xs);
-    font-weight: var(--font-weight-bold);
-    letter-spacing: 0.06em;
-    color: var(--color-text-tertiary);
-    }
-
-    .rankingEmpty {
-    font-size: var(--font-size-sm);
-    color: var(--color-text-secondary);
-    }
-
-    .rankingRow {
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-sm);
-    padding: var(--spacing-xs) 0;
-    width: 100%;
-    background: transparent;
-    border: none;
-    text-align: left;
-    }
-
-    .rankingPosition {
-    width: 18px;
-    font-size: var(--font-size-sm);
-    font-weight: var(--font-weight-bold);
-    color: var(--color-text-tertiary);
-    text-align: center;
-    flex-shrink: 0;
-    }
-
-    .rankingFirst {
-    color: var(--color-primary);
-    }
-
-    .rankingAvatar {
-    border-radius: 50%;
-    flex-shrink: 0;
-    }
-
-    .rankingName {
-    flex: 1;
-    font-size: var(--font-size-sm);
-    color: var(--color-text);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    }
-
-    .rankingValue {
-    font-size: var(--font-size-sm);
-    font-weight: var(--font-weight-bold);
-    color: var(--color-text);
-    flex-shrink: 0;
     }

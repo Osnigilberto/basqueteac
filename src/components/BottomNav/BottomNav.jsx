@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Home, CalendarDays, Target, TrendingUp, Users, UserRound } from 'lucide-react'
+import { Home, CalendarDays, Target, TrendingUp, UserRound } from 'lucide-react'
 import styles from './BottomNav.module.css'
 
 const TABS = [
@@ -10,7 +10,6 @@ const TABS = [
   { href: '/game', label: 'Jogos', icon: CalendarDays },
   { href: '/training', label: 'Treinos', icon: Target },
   { href: '/stats', label: 'Stats', icon: TrendingUp },
-  { href: '/players', label: 'Atletas', icon: Users },
   { href: '/profile', label: 'Perfil', icon: UserRound },
 ]
 

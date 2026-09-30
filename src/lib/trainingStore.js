@@ -9,6 +9,7 @@ import { getChallenge, mergeBest } from '@/lib/challenges'
 import { DRILL_TYPES } from '@/lib/biomechanics'
 
 const HISTORY_LIMIT = 10
+const DAYS_LIMIT = 60
 
 function historyKey(uid) {
   return `basqueteac_trainings_${uid}`
@@ -44,13 +45,44 @@ export function sessionZone(session) {
   return session.zone || DRILL_TYPES[session.drillId]?.zone || null
 }
 
+/** 'AAAA-MM-DD' no fuso local */
+export function dayKey(date) {
+  const pad = (n) => String(n).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
+}
+
+function mergeDays(a = [], b = []) {
+  return Array.from(new Set([...a, ...b]))
+    .sort()
+    .reverse()
+    .slice(0, DAYS_LIMIT)
+}
+
+/**
+ * Dias seguidos com treino terminando hoje — ou ontem, para a sequência
+ * não "quebrar" antes de a pessoa treinar no dia.
+ */
+export function trainingStreak(days = [], today = new Date()) {
+  const set = new Set(days)
+  const cursor = new Date(today.getFullYear(), today.getMonth(), today.getDate())
+  if (!set.has(dayKey(cursor))) cursor.setDate(cursor.getDate() - 1)
+  let streak = 0
+  while (set.has(dayKey(cursor))) {
+    streak += 1
+    cursor.setDate(cursor.getDate() - 1)
+  }
+  return streak
+}
+
 /**
  * Números acumulados de uma lista de treinos:
- * { count, reps, scoreSum, zones: { '3PT': { makes, attempts }, ... } }
+ * { count, reps, scoreSum, zones: { '3PT': { makes, attempts }, ... }, days: ['AAAA-MM-DD', ...] }
  */
 export function summarizeHistory(sessions) {
-  const stats = { count: 0, reps: 0, scoreSum: 0, zones: {} }
+  const stats = { count: 0, reps: 0, scoreSum: 0, zones: {}, days: [] }
+  const days = []
   sessions.forEach((s) => {
+    if (s.createdAt?.seconds) days.push(dayKey(new Date(s.createdAt.seconds * 1000)))
     stats.count += 1
     stats.reps += s.totalReps || 0
     stats.scoreSum += s.consistencyScore || 0
@@ -61,6 +93,7 @@ export function summarizeHistory(sessions) {
       z.attempts += s.attempts
     }
   })
+  stats.days = mergeDays(days)
   return stats
 }
 
@@ -70,7 +103,13 @@ function addStats(a, b) {
     const prev = zones[k] || { makes: 0, attempts: 0 }
     zones[k] = { makes: prev.makes + z.makes, attempts: prev.attempts + z.attempts }
   })
-  return { count: a.count + b.count, reps: a.reps + b.reps, scoreSum: a.scoreSum + b.scoreSum, zones }
+  return {
+    count: a.count + b.count,
+    reps: a.reps + b.reps,
+    scoreSum: a.scoreSum + b.scoreSum,
+    zones,
+    days: mergeDays(a.days, b.days),
+  }
 }
 
 export function cachedTrainingSessions(uid) {
@@ -108,7 +147,10 @@ export async function saveTrainingSession(uid, record) {
     { id: 'session-' + Date.now(), ...record, createdAt: { seconds: Math.floor(Date.now() / 1000) } },
     ...cachedTrainingSessions(uid),
   ].slice(0, HISTORY_LIMIT)
-  const stats = addStats(cachedTrainingStats(uid), summarizeHistory([record]))
+  const stats = addStats(
+    cachedTrainingStats(uid),
+    summarizeHistory([{ ...record, createdAt: { seconds: Math.floor(Date.now() / 1000) } }])
+  )
   writeLocal(historyKey(uid), recent)
   writeLocal(statsKey(uid), stats)
 

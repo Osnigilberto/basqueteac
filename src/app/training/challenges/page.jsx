@@ -17,6 +17,7 @@ import {
   TIER_COLORS,
   challengesOf,
   computeProgress,
+  getChallenge,
   formatTier,
   formatValue,
   isUnlocked,
@@ -37,15 +38,27 @@ function Stars({ count, size = 14 }) {
   )
 }
 
+// Link direto (ex.: "Treino do dia" no Início): ?cat=<fundamento>&c=<desafio>
+function linkedChallenge() {
+  if (typeof window === 'undefined') return null
+  return getChallenge(new URLSearchParams(window.location.search).get('c'))
+}
+
+function initialCategory() {
+  if (typeof window === 'undefined') return CHALLENGE_CATEGORIES[0].id
+  const cat = new URLSearchParams(window.location.search).get('cat')
+  return linkedChallenge()?.category || (CHALLENGE_CATEGORIES.some((c) => c.id === cat) ? cat : CHALLENGE_CATEGORIES[0].id)
+}
+
 export default function ChallengesPage() {
   const router = useRouter()
   const { user, loading } = useAuth()
 
-  const [category, setCategory] = useState(CHALLENGE_CATEGORIES[0].id)
+  const [category, setCategory] = useState(initialCategory)
   const [best, setBest] = useState({})
-  const [selected, setSelected] = useState(null)
+  const [selected, setSelected] = useState(linkedChallenge)
   const [dominantHand, setDominantHand] = useState('right')
-  const [cameraFacing, setCameraFacing] = useState('environment')
+  const [cameraFacing, setCameraFacing] = useState(() => DRILL_TYPES[initialCategory()].camera)
   const [aiReady, setAiReady] = useState(false)
   const [running, setRunning] = useState(false)
 
@@ -78,6 +91,9 @@ export default function ChallengesPage() {
     unlockAudio()
     setRunning(true)
   }
+
+  // Espera o login (evita piscar a tela e diferenças de hidratação com os parâmetros da URL)
+  if (loading || !user) return null
 
   return (
     <main className={styles.page}>

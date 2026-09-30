@@ -26,9 +26,18 @@ import {
   Share2,
   Check,
   Users,
+  Undo2,
+  SlidersHorizontal,
+  ChevronDown,
+  Pause,
+  Dices,
+  Flag,
 } from 'lucide-react'
 import { db } from '@/lib/firebase'
 import { useAuth } from '@/hooks/useAuth'
+import { formatGameDate, displayName } from '@/lib/format'
+import { gameMvp, invalidateGroupData, fetchGroupData, playerGameLog, computeAverages } from '@/lib/gameStats'
+import { inverseAction, describeAction, pushAction, drawTeams } from '@/lib/gameActions'
 import styles from './page.module.css'
 
 const STATUS_LABELS = {
@@ -46,26 +55,6 @@ const STAT_FIELDS = [
   { key: 'steals', label: 'ROU' },
 ]
 
-function formatGameDate(timestamp) {
-  const date = timestamp.toDate()
-  const dateStr = date.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' })
-  const timeStr = date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
-  return `${dateStr} · ${timeStr}`
-}
-
-function calculateMvp(game, statsList) {
-  if (game.status !== 'finished' || statsList.length === 0) return null
-
-  const withTotal = statsList.map((s) => ({
-    ...s,
-    total: (s.points || 0) + (s.rebounds || 0) + (s.assists || 0) + (s.blocks || 0) + (s.steals || 0),
-  }))
-
-  const maxTotal = Math.max(...withTotal.map((s) => s.total))
-  if (maxTotal === 0) return null
-
-  return { winners: withTotal.filter((s) => s.total === maxTotal), total: maxTotal }
-}
 
 export default function GamePage() {
   const { id: gameId } = useParams()
@@ -79,6 +68,15 @@ export default function GamePage() {
   const [copied, setCopied] = useState(false)
 
   const [selectedUid, setSelectedUid] = useState(null)
+
+  // Pilha de ações marcadas NESTE aparelho, para "Desfazer última ação"
+  const [undoStack, setUndoStack] = useState([])
+  const [undoing, setUndoing] = useState(false)
+  const [showSettings, setShowSettings] = useState(false)
+  const [confirmFinish, setConfirmFinish] = useState(false)
+  const [showDurations, setShowDurations] = useState(false)
+  const [balanceByPpg, setBalanceByPpg] = useState(true)
+  const [drawing, setDrawing] = useState(false)
 
   // "Definir times" — só usado em jogos "Time x Time" antes dos times existirem
   const [setupAssignments, setSetupAssignments] = useState({})
@@ -216,7 +214,8 @@ export default function GamePage() {
 
   // Marca pontos: atualiza o placar do time E o total do jogador juntos.
   // Se for cesta de 3, conta separadamente também (usado pras medalhas)
-  async function addPoints(uid, team, value) {
+  async function addPoints(uid, team, value, { record = true } = {}) {
+    if (record) setUndoStack((prev) => pushAction(prev, { kind: 'points', uid, team, value }))
     const batch = writeBatch(db)
     batch.update(doc(db, 'games', gameId), {
       [`team${team}.score`]: increment(value),
@@ -234,7 +233,8 @@ export default function GamePage() {
 
   // Desfaz especificamente uma cesta de 3 — diferente do "−1" genérico,
   // esse aqui corrige o placar E o contador de cestas de 3 juntos
-  async function undoThreePointer(uid, team) {
+  async function undoThreePointer(uid, team, { record = true } = {}) {
+    if (record) setUndoStack((prev) => pushAction(prev, { kind: 'undoThree', uid, team }))
     const batch = writeBatch(db)
     batch.update(doc(db, 'games', gameId), {
       [`team${team}.score`]: increment(-3),
@@ -247,10 +247,29 @@ export default function GamePage() {
     await batch.commit()
   }
 
-  async function addStat(uid, field, value) {
+  async function addStat(uid, field, value, { record = true } = {}) {
+    if (record) setUndoStack((prev) => pushAction(prev, { kind: 'stat', uid, field, value }))
     await updateDoc(doc(db, 'games', gameId, 'stats', uid), {
       [field]: increment(value),
     })
+  }
+
+  // Aplica o inverso da última ação marcada neste aparelho
+  async function undoLastAction() {
+    const last = undoStack[undoStack.length - 1]
+    if (!last || undoing) return
+    setUndoing(true)
+    setUndoStack((prev) => prev.slice(0, -1))
+    const inv = inverseAction(last)
+    try {
+      if (inv.kind === 'points') await addPoints(inv.uid, inv.team, inv.value, { record: false })
+      else if (inv.kind === 'undoThree') await undoThreePointer(inv.uid, inv.team, { record: false })
+      else await addStat(inv.uid, inv.field, inv.value, { record: false })
+    } catch (error) {
+      console.error('[undoLastAction]', error)
+    } finally {
+      setUndoing(false)
+    }
   }
 
   async function startGame() {
@@ -258,8 +277,12 @@ export default function GamePage() {
   }
 
   async function finishGame() {
+    setConfirmFinish(false)
     setSelectedUid(null)
+    setUndoStack([])
     await updateDoc(doc(db, 'games', gameId), { status: 'finished', updatedAt: serverTimestamp() })
+    // Rankings/Stats/Perfil passam a considerar este jogo
+    invalidateGroupData()
   }
 
   async function updateTargetScore(value) {
@@ -284,15 +307,37 @@ export default function GamePage() {
     }
   }
 
-  function setSetupTeam(uid, team) {
+  // Toque no jogador: sem time → A → B → sem time
+  function cycleSetup(uid) {
     setSetupAssignments((prev) => {
-      if (prev[uid] === team) {
-        const next = { ...prev }
-        delete next[uid]
-        return next
-      }
-      return { ...prev, [uid]: team }
+      const next = { ...prev }
+      if (!prev[uid]) next[uid] = 'A'
+      else if (prev[uid] === 'A') next[uid] = 'B'
+      else delete next[uid]
+      return next
     })
+  }
+
+  // Sorteia os times; com "equilibrar", usa o PPG da temporada (snake draft)
+  async function drawSetupTeams() {
+    setDrawing(true)
+    const roster = game.roster || []
+    const ratings = {}
+    if (balanceByPpg) {
+      try {
+        const { games } = await fetchGroupData()
+        const year = new Date().getFullYear()
+        const season = games.filter((g) => g.date.toDate().getFullYear() === year)
+        roster.forEach((uid) => {
+          ratings[uid] = computeAverages(playerGameLog(season, uid))?.points || 0
+        })
+      } catch (error) {
+        console.error('[drawSetupTeams → PPG]', error)
+      }
+    }
+    const { A, B } = drawTeams(roster, ratings)
+    setSetupAssignments(Object.fromEntries([...A.map((u) => [u, 'A']), ...B.map((u) => [u, 'B'])]))
+    setDrawing(false)
   }
 
   async function confirmTeams() {
@@ -381,7 +426,17 @@ export default function GamePage() {
       : null
     : null
 
-  const mvp = calculateMvp(game, stats)
+  const isFinished = game.status === 'finished'
+  const mvp = isFinished ? gameMvp(stats.map((s) => ({ ...s, points: s.points || 0 }))) : null
+  const winnerTeam = isFinished
+    ? game.teamA.score > game.teamB.score
+      ? 'A'
+      : game.teamB.score > game.teamA.score
+      ? 'B'
+      : null
+    : null
+  const lastAction = undoStack[undoStack.length - 1]
+  const nameOf = (uid) => displayName(playersMap[uid])
 
   const needsTeamSetup =
     game.gameType === 'teams' && game.teamA.players.length === 0 && game.teamB.players.length === 0
@@ -391,12 +446,17 @@ export default function GamePage() {
   const setupTeamBCount = Object.values(setupAssignments).filter((t) => t === 'B').length
   const canConfirmTeams = setupTeamACount > 0 && setupTeamBCount > 0
 
+  const unassigned = rosterMembers.filter(({ uid }) => !setupAssignments[uid])
+  const assignedTo = (team) => rosterMembers.filter(({ uid }) => setupAssignments[uid] === team)
+  const progress = (score) => (targetScore ? Math.min(100, Math.round((score / targetScore) * 100)) : 0)
+
   return (
     <main className={styles.page}>
       <header className={styles.header}>
         <button
           className={styles.backButton}
           onClick={() => (user ? router.back() : router.push('/'))}
+          aria-label="Voltar"
         >
           <ArrowLeft size={18} />
         </button>
@@ -408,359 +468,476 @@ export default function GamePage() {
         </button>
       </header>
 
-      <section className={styles.scoreBanner}>
-        <div className={styles.scoreTeam}>
-          <span className={styles.scoreTeamName}>{game.teamA.name}</span>
-          <span className={styles.scoreValue}>{game.teamA.score}</span>
+      {/* PLACAR (fixo no topo durante o jogo) */}
+      <section className={`${styles.scoreBanner} ${isLive ? styles.scoreBannerSticky : ''}`}>
+        <div className={styles.scoreInner}>
+          {['A', 'B'].map((team, i) => {
+            const t = team === 'A' ? game.teamA : game.teamB
+            return (
+              <div key={team} className={styles.scoreSide}>
+                {i === 1 && <span className={styles.scoreDivider}>×</span>}
+                <div
+                  className={`${styles.scoreTeam} ${winnerTeam && winnerTeam !== team ? styles.scoreTeamLoser : ''}`}
+                >
+                  <span className={styles.scoreTeamName}>
+                    {winnerTeam === team && '🏆 '}
+                    {t.name}
+                  </span>
+                  <span className={team === 'A' ? styles.scoreValue : styles.scoreValuePreto}>{t.score}</span>
+                  {targetScore && !isFinished && (
+                    <span className={styles.progressTrack} aria-label={`${t.score} de ${targetScore}`}>
+                      <span
+                        className={`${styles.progressBar} ${team === 'B' ? styles.progressBarB : ''}`}
+                        style={{ width: `${progress(t.score)}%` }}
+                      />
+                    </span>
+                  )}
+                </div>
+              </div>
+            )
+          })}
         </div>
-        <span className={styles.scoreDivider}>-</span>
-        <div className={styles.scoreTeam}>
-          <span className={styles.scoreTeamName}>{game.teamB.name}</span>
-          <span className={styles.scoreValuePreto}>{game.teamB.score}</span>
-        </div>
+        {targetScore && !isFinished && <span className={styles.targetMini}>Alvo: {targetScore} pontos</span>}
       </section>
 
-      {user && (
-        <div className={styles.editTeamsContainer}>
-          {!editingTeams ? (
-            <button
-              type="button"
-              className={styles.editTeamsBtn}
-              onClick={() => {
-                setTeamANameInput(game.teamA.name || 'Time Branco')
-                setTeamBNameInput(game.teamB.name || 'Time Preto')
-                setEditingTeams(true)
-              }}
-            >
-              <Pencil size={12} />
-              Editar nomes das equipes
-            </button>
-          ) : (
-            <form className={styles.editTeamsForm} onSubmit={handleSaveTeams}>
-              <input
-                type="text"
-                className={styles.editTeamField}
-                value={teamANameInput}
-                onChange={(e) => setTeamANameInput(e.target.value)}
-                placeholder="Equipe 1"
-                required
-              />
-              <span className={styles.editTeamsDivider}>x</span>
-              <input
-                type="text"
-                className={styles.editTeamField}
-                value={teamBNameInput}
-                onChange={(e) => setTeamBNameInput(e.target.value)}
-                placeholder="Equipe 2"
-                required
-              />
-              <button type="submit" className={styles.editTeamsSaveBtn} title="Salvar">
-                <Check size={14} />
-              </button>
-              <button
-                type="button"
-                className={styles.editTeamsCancelBtn}
-                onClick={() => setEditingTeams(false)}
-                title="Cancelar"
-              >
-                <X size={14} />
-              </button>
-            </form>
-          )}
-        </div>
-      )}
-
-      {targetReachedTeam && (
-        <p className={styles.targetReached}>
-          🏆 {targetReachedTeam} atingiu {targetScore} pontos!
-        </p>
-      )}
-
-      {mvp && (
-        <p className={styles.mvpBanner}>
-          🏅 MVP da partida:{' '}
-          {mvp.winners
-            .map((w) => playersMap[w.uid]?.nickname || playersMap[w.uid]?.name || 'Jogador')
-            .join(' e ')}{' '}
-          ({mvp.total} na soma geral)
-        </p>
-      )}
-
-      <p className={styles.gameInfo}>
-        <CalendarDays size={14} /> {formatGameDate(game.date)}
-      </p>
-      <p className={styles.gameInfo}>
-        <MapPin size={14} /> {game.location}
-      </p>
-
-      <div className={styles.targetRow}>
-        {!user ? (
-          <span className={styles.targetDisplay}>
-            <Target size={14} />
-            {targetScore ? `Alvo: ${targetScore} pontos` : 'Sem limite de pontos'}
-          </span>
-        ) : !editingTarget ? (
-          <button className={styles.targetDisplay} onClick={() => setEditingTarget(true)}>
-            <Target size={14} />
-            {targetScore ? `Alvo: ${targetScore} pontos` : 'Sem limite de pontos'}
-            <Pencil size={12} />
-          </button>
-        ) : (
-          <div className={styles.targetEditor}>
-            {TARGET_PRESETS.map((value) => (
-              <button key={value} className={styles.targetButton} onClick={() => updateTargetScore(value)}>
-                {value}
-              </button>
-            ))}
-            <button className={styles.targetButton} onClick={() => updateTargetScore(null)}>
-              Livre
-            </button>
-            <input
-              type="number"
-              min={1}
-              className={styles.targetInput}
-              placeholder="Outro"
-              value={customTargetInput}
-              onChange={(e) => setCustomTargetInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault()
-                  const value = parseInt(customTargetInput, 10)
-                  if (value > 0) updateTargetScore(value)
-                }
-              }}
-            />
-            <button
-              type="button"
-              className={styles.targetCancel}
-              onClick={() => {
-                setEditingTarget(false)
-                setCustomTargetInput('')
-              }}
-            >
-              <X size={14} />
+      <div className={styles.inner}>
+        {isLive && user && lastAction && (
+          <div className={styles.undoBar}>
+            <button type="button" className={styles.undoButton} onClick={undoLastAction} disabled={undoing}>
+              <Undo2 size={16} />
+              Desfazer: {describeAction(lastAction)} {nameOf(lastAction.uid)}
             </button>
           </div>
         )}
-      </div>
 
-      {isScheduled && user && needsTeamSetup && (
-        <section className={styles.setupCard}>
-          <div className={styles.setupHeader}>
-            <Users size={14} />
-            DEFINIR TIMES
+        {/* Alvo atingido: oferece encerrar */}
+        {targetReachedTeam && isLive && (
+          <div className={styles.targetReachedCard}>
+            <span>
+              🏆 <b>{targetReachedTeam}</b> atingiu {targetScore} pontos!
+            </span>
+            {user && (
+              <button type="button" className={styles.targetFinishButton} onClick={() => setConfirmFinish(true)}>
+                <Flag size={14} /> Encerrar jogo
+              </button>
+            )}
           </div>
-          <p className={styles.setupHint}>
-            {game.teamA.name} ({setupTeamACount}) · {game.teamB.name} ({setupTeamBCount})
-          </p>
+        )}
 
-          <div className={styles.setupList}>
-            {rosterMembers.map(({ uid, player }) => (
-              <div key={uid} className={styles.setupRow}>
-                <div className={styles.playerInfo}>
-                  {player.photoURL && (
-                    <Image
-                      src={player.photoURL}
-                      alt={player.name || ''}
-                      width={32}
-                      height={32}
-                      className={styles.playerAvatar}
-                    />
+        {mvp && (
+          <p className={styles.mvpBanner}>
+            🏅 MVP da partida: {mvp.uids.map(nameOf).join(' e ')} ({mvp.total} na soma geral)
+          </p>
+        )}
+
+        <div className={styles.infoRow}>
+          <span className={styles.gameInfo}>
+            <CalendarDays size={14} /> {formatGameDate(game.date)}
+          </span>
+          <span className={styles.gameInfo}>
+            <MapPin size={14} /> {game.location}
+          </span>
+          {!targetScore && (
+            <span className={styles.gameInfo}>
+              <Target size={14} /> Sem limite de pontos
+            </span>
+          )}
+        </div>
+
+        {/* AJUSTES (nomes e alvo) */}
+        {user && (
+          <section className={styles.settingsCard}>
+            <button
+              type="button"
+              className={styles.settingsToggle}
+              onClick={() => setShowSettings((v) => !v)}
+              aria-expanded={showSettings}
+            >
+              <SlidersHorizontal size={14} />
+              Ajustes do jogo
+              <ChevronDown
+                size={16}
+                className={`${styles.settingsChevron} ${showSettings ? styles.settingsChevronOpen : ''}`}
+              />
+            </button>
+            {showSettings && (
+              <div className={styles.settingsBody}>
+                <div className={styles.editTeamsContainer}>
+                  {!editingTeams ? (
+                    <button
+                      type="button"
+                      className={styles.editTeamsBtn}
+                      onClick={() => {
+                        setTeamANameInput(game.teamA.name || 'Time Branco')
+                        setTeamBNameInput(game.teamB.name || 'Time Preto')
+                        setEditingTeams(true)
+                      }}
+                    >
+                      <Pencil size={12} />
+                      Editar nomes das equipes
+                    </button>
+                  ) : (
+                    <form className={styles.editTeamsForm} onSubmit={handleSaveTeams}>
+                      <input
+                        type="text"
+                        className={styles.editTeamField}
+                        value={teamANameInput}
+                        onChange={(e) => setTeamANameInput(e.target.value)}
+                        placeholder="Equipe 1"
+                        required
+                      />
+                      <span className={styles.editTeamsDivider}>x</span>
+                      <input
+                        type="text"
+                        className={styles.editTeamField}
+                        value={teamBNameInput}
+                        onChange={(e) => setTeamBNameInput(e.target.value)}
+                        placeholder="Equipe 2"
+                        required
+                      />
+                      <button type="submit" className={styles.editTeamsSaveBtn} title="Salvar">
+                        <Check size={14} />
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.editTeamsCancelBtn}
+                        onClick={() => setEditingTeams(false)}
+                        title="Cancelar"
+                      >
+                        <X size={14} />
+                      </button>
+                    </form>
                   )}
-                  <span className={styles.playerName}>
-                    {player.nickname || player.name || 'Jogador'}
-                  </span>
                 </div>
 
-                <div className={styles.setupToggle}>
-                  <button
-                    type="button"
-                    className={`${styles.setupTeamButton} ${
-                      setupAssignments[uid] === 'A' ? styles.setupTeamButtonActiveA : ''
-                    }`}
-                    onClick={() => setSetupTeam(uid, 'A')}
-                    title={game.teamA.name}
-                  >
-                    {game.teamA.name}
-                  </button>
-                  <button
-                    type="button"
-                    className={`${styles.setupTeamButton} ${
-                      setupAssignments[uid] === 'B' ? styles.setupTeamButtonActiveB : ''
-                    }`}
-                    onClick={() => setSetupTeam(uid, 'B')}
-                    title={game.teamB.name}
-                  >
-                    {game.teamB.name}
-                  </button>
+                <div className={styles.targetRow}>
+                  {!editingTarget ? (
+                    <button className={styles.targetDisplay} onClick={() => setEditingTarget(true)}>
+                      <Target size={14} />
+                      {targetScore ? `Alvo: ${targetScore} pontos` : 'Sem limite de pontos'}
+                      <Pencil size={12} />
+                    </button>
+                  ) : (
+                    <div className={styles.targetEditor}>
+                      {TARGET_PRESETS.map((value) => (
+                        <button key={value} className={styles.targetButton} onClick={() => updateTargetScore(value)}>
+                          {value}
+                        </button>
+                      ))}
+                      <button className={styles.targetButton} onClick={() => updateTargetScore(null)}>
+                        Livre
+                      </button>
+                      <input
+                        type="number"
+                        min={1}
+                        className={styles.targetInput}
+                        placeholder="Outro"
+                        value={customTargetInput}
+                        onChange={(e) => setCustomTargetInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault()
+                            const value = parseInt(customTargetInput, 10)
+                            if (value > 0) updateTargetScore(value)
+                          }
+                        }}
+                      />
+                      <button
+                        type="button"
+                        className={styles.targetCancel}
+                        onClick={() => {
+                          setEditingTarget(false)
+                          setCustomTargetInput('')
+                        }}
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
-            ))}
-          </div>
+            )}
+          </section>
+        )}
 
-          <button className={styles.confirmTeamsButton} disabled={!canConfirmTeams} onClick={confirmTeams}>
-            Confirmar times
-          </button>
-        </section>
-      )}
-
-      {isScheduled && user && !needsTeamSetup && (
-        <button className={styles.startButton} onClick={startGame}>
-          <Play size={16} />
-          Iniciar jogo
-        </button>
-      )}
-
-      {isLive && user && (
-        <>
-          <div className={styles.timerCard}>
-            <div className={styles.timerDurations}>
-              {[14, 24, 30].map((d) => (
-                <button
-                  key={d}
-                  className={`${styles.durationButton} ${timerDuration === d ? styles.durationButtonActive : ''}`}
-                  onClick={() => changeDuration(d)}
-                >
-                  {d}s
-                </button>
-              ))}
-              <input
-                type="number"
-                min={1}
-                max={60}
-                className={styles.durationInput}
-                placeholder="Outro"
-                value={customInput}
-                onChange={(e) => setCustomInput(e.target.value)}
-                onBlur={commitCustomDuration}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault()
-                    commitCustomDuration()
-                  }
-                }}
-              />
+        {/* MONTAR OS TIMES */}
+        {isScheduled && user && needsTeamSetup && (
+          <section className={styles.setupCard}>
+            <div className={styles.setupHeader}>
+              <Users size={14} />
+              MONTAR OS TIMES
+              <span className={styles.setupCount}>{rosterMembers.length} confirmados</span>
             </div>
 
-            <span className={`${styles.timerValue} ${timeLeft <= 5 ? styles.timerValueDanger : ''}`}>
-              {timeLeft}
-            </span>
-
-            <p className={styles.timerStatus}>
-              {timerRunning
-                ? 'Contando...'
-                : timeLeft === 0
-                ? 'Zerou'
-                : timeLeft === timerDuration
-                ? 'Pronto'
-                : 'Pausado — bola fora ou falta'}
-            </p>
-
-            <div className={styles.timerControls}>
-              {!timerRunning ? (
-                <button className={styles.timerButtonLabeled} onClick={startTimer}>
-                  <Play size={20} />
-                  <span>{timeLeft === timerDuration || timeLeft === 0 ? 'Iniciar' : 'Continuar'}</span>
-                </button>
-              ) : (
-                <button className={styles.timerButtonLabeled} onClick={pauseTimer}>
-                  <Square size={20} />
-                  <span>Pausar</span>
-                </button>
-              )}
-              <button className={styles.timerButtonLabeled} onClick={() => resetTimer()}>
-                <RotateCcw size={20} />
-                <span>Reiniciar</span>
+            <div className={styles.drawRow}>
+              <button type="button" className={styles.drawButton} onClick={drawSetupTeams} disabled={drawing}>
+                <Dices size={16} /> {drawing ? 'Sorteando...' : 'Sortear times'}
               </button>
+              <label className={styles.balanceToggle}>
+                <input type="checkbox" checked={balanceByPpg} onChange={(e) => setBalanceByPpg(e.target.checked)} />
+                Equilibrar pelo PPG
+              </label>
             </div>
-          </div>
 
-          <button className={styles.finishButton} onClick={finishGame}>
-            Encerrar jogo
+            <div className={styles.setupColumns}>
+              {['A', 'B'].map((team) => (
+                <div key={team} className={`${styles.setupColumn} ${team === 'B' ? styles.setupColumnB : ''}`}>
+                  <span className={styles.setupColumnTitle}>
+                    {team === 'A' ? game.teamA.name : game.teamB.name} · {assignedTo(team).length}
+                  </span>
+                  {assignedTo(team).map(({ uid, player }) => (
+                    <SetupChip key={uid} player={player} team={team} onClick={() => cycleSetup(uid)} styles={styles} />
+                  ))}
+                  {assignedTo(team).length === 0 && <span className={styles.setupEmpty}>Ninguém ainda</span>}
+                </div>
+              ))}
+            </div>
+
+            {unassigned.length > 0 && (
+              <>
+                <span className={styles.setupColumnTitle}>Sem time · {unassigned.length}</span>
+                <div className={styles.unassignedList}>
+                  {unassigned.map(({ uid, player }) => (
+                    <SetupChip key={uid} player={player} onClick={() => cycleSetup(uid)} styles={styles} />
+                  ))}
+                </div>
+              </>
+            )}
+
+            <p className={styles.setupHint}>Toque num jogador para trocar: sem time → {game.teamA.name} → {game.teamB.name}.</p>
+
+            <button className={styles.confirmTeamsButton} disabled={!canConfirmTeams} onClick={confirmTeams}>
+              Confirmar times
+            </button>
+          </section>
+        )}
+
+        {isScheduled && user && !needsTeamSetup && (
+          <button className={styles.startButton} onClick={startGame}>
+            <Play size={16} />
+            Iniciar jogo
           </button>
-        </>
-      )}
+        )}
 
-      <TeamSection
-        title={game.teamA.name}
-        rows={getTeamRows('A')}
-        editable={isLive && !!user}
-        onSelect={setSelectedUid}
-        styles={styles}
-      />
+        {/* CRONÔMETRO DE POSSE (compacto) */}
+        {isLive && user && (
+          <div className={styles.timerCard}>
+            <div className={styles.timerMain}>
+              <span className={`${styles.timerValue} ${timeLeft <= 5 ? styles.timerValueDanger : ''}`}>{timeLeft}</span>
+              <div className={styles.timerInfo}>
+                <span className={styles.timerStatus}>
+                  {timerRunning
+                    ? 'Contando...'
+                    : timeLeft === 0
+                    ? 'Zerou'
+                    : timeLeft === timerDuration
+                    ? 'Pronto'
+                    : 'Pausado'}
+                </span>
+                <button type="button" className={styles.durationToggle} onClick={() => setShowDurations((v) => !v)}>
+                  Posse de {timerDuration}s <ChevronDown size={12} />
+                </button>
+              </div>
+              <div className={styles.timerControls}>
+                {!timerRunning ? (
+                  <button
+                    className={`${styles.timerIconButton} ${styles.timerPrimary}`}
+                    onClick={startTimer}
+                    aria-label={timeLeft === timerDuration || timeLeft === 0 ? 'Iniciar' : 'Continuar'}
+                  >
+                    <Play size={20} />
+                  </button>
+                ) : (
+                  <button className={`${styles.timerIconButton} ${styles.timerPrimary}`} onClick={pauseTimer} aria-label="Pausar">
+                    <Pause size={20} />
+                  </button>
+                )}
+                <button className={styles.timerIconButton} onClick={() => resetTimer()} aria-label="Reiniciar">
+                  <RotateCcw size={18} />
+                </button>
+              </div>
+            </div>
 
-      <TeamSection
-        title={game.teamB.name}
-        rows={getTeamRows('B')}
-        editable={isLive && !!user}
-        onSelect={setSelectedUid}
-        accent
-        styles={styles}
-      />
+            {showDurations && (
+              <div className={styles.timerDurations}>
+                {[14, 24, 30].map((d) => (
+                  <button
+                    key={d}
+                    className={`${styles.durationButton} ${timerDuration === d ? styles.durationButtonActive : ''}`}
+                    onClick={() => changeDuration(d)}
+                  >
+                    {d}s
+                  </button>
+                ))}
+                <input
+                  type="number"
+                  min={1}
+                  max={60}
+                  className={styles.durationInput}
+                  placeholder="Outro"
+                  value={customInput}
+                  onChange={(e) => setCustomInput(e.target.value)}
+                  onBlur={commitCustomDuration}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      commitCustomDuration()
+                    }
+                  }}
+                />
+              </div>
+            )}
+          </div>
+        )}
 
+        {/* TABELAS (escondidas enquanto os times não foram montados) */}
+        {!needsTeamSetup && (
+          <>
+            {isLive && user && <p className={styles.tapHint}>Toque num jogador para marcar pontos e estatísticas.</p>}
+            <TeamSection
+              title={game.teamA.name}
+              rows={getTeamRows('A')}
+              editable={isLive && !!user}
+              onSelect={setSelectedUid}
+              mvpUids={mvp?.uids || []}
+              styles={styles}
+            />
+            <TeamSection
+              title={game.teamB.name}
+              rows={getTeamRows('B')}
+              editable={isLive && !!user}
+              onSelect={setSelectedUid}
+              mvpUids={mvp?.uids || []}
+              accent
+              styles={styles}
+            />
+          </>
+        )}
+
+        {isLive && user && (
+          <button className={styles.finishButton} onClick={() => setConfirmFinish(true)}>
+            <Flag size={16} /> Encerrar jogo
+          </button>
+        )}
+      </div>
+
+      {/* PAINEL DO JOGADOR */}
       {selectedStat && (
         <div className={styles.drawerOverlay} onClick={() => setSelectedUid(null)}>
           <div className={styles.drawer} onClick={(e) => e.stopPropagation()}>
             <div className={styles.drawerHeader}>
               <span className={styles.drawerName}>
-                {selectedPlayer?.nickname || selectedPlayer?.name || 'Jogador'}
+                {displayName(selectedPlayer)}
+                <small>
+                  {selectedStat.points} pts · {selectedStat.threePointers || 0} de 3
+                </small>
               </span>
-              <button className={styles.drawerClose} onClick={() => setSelectedUid(null)}>
+              <button className={styles.drawerClose} onClick={() => setSelectedUid(null)} aria-label="Fechar">
                 <X size={18} />
               </button>
             </div>
 
-            <div className={styles.drawerRow}>
-              <span className={styles.drawerLabel}>
-                PTS — {selectedStat.points} ({selectedStat.threePointers || 0} de 3)
-              </span>
-              <div className={styles.drawerButtons}>
-                <button
-                  className={styles.minusButton}
-                  disabled={selectedStat.points === 0}
-                  onClick={() => addPoints(selectedUid, selectedStat.team, -1)}
-                >
-                  −1
-                </button>
-                <button
-                  className={styles.minusButton}
-                  disabled={!selectedStat.threePointers}
-                  onClick={() => undoThreePointer(selectedUid, selectedStat.team)}
-                  title="Desfaz uma cesta de 3"
-                >
-                  −3
-                </button>
-                <button className={styles.plusButton} onClick={() => addPoints(selectedUid, selectedStat.team, 1)}>
-                  +1
-                </button>
-                <button className={styles.plusButton} onClick={() => addPoints(selectedUid, selectedStat.team, 2)}>
-                  +2
-                </button>
-                <button className={styles.plusButton} onClick={() => addPoints(selectedUid, selectedStat.team, 3)}>
-                  +3
-                </button>
-              </div>
+            {/* Troca de jogador sem fechar o painel */}
+            <div className={styles.playerChips}>
+              {['A', 'B'].map((team) =>
+                getTeamRows(team).map((row) => (
+                  <button
+                    key={row.uid}
+                    type="button"
+                    className={`${styles.playerChip} ${team === 'B' ? styles.playerChipB : ''} ${
+                      row.uid === selectedUid ? styles.playerChipActive : ''
+                    }`}
+                    onClick={() => setSelectedUid(row.uid)}
+                  >
+                    {displayName(row.player)} <small>{row.points}</small>
+                  </button>
+                ))
+              )}
             </div>
 
-            {STAT_FIELDS.map((field) => (
-              <div className={styles.drawerRow} key={field.key}>
-                <span className={styles.drawerLabel}>
-                  {field.label} — {selectedStat[field.key]}
-                </span>
-                <div className={styles.drawerButtons}>
-                  <button
-                    className={styles.minusButton}
-                    disabled={selectedStat[field.key] === 0}
-                    onClick={() => addStat(selectedUid, field.key, -1)}
-                  >
-                    −1
-                  </button>
-                  <button className={styles.plusButton} onClick={() => addStat(selectedUid, field.key, 1)}>
-                    +1
-                  </button>
+            {/* Pontos: botões grandes */}
+            <div className={styles.pointButtons}>
+              {[1, 2, 3].map((v) => (
+                <button key={v} className={styles.pointButton} onClick={() => addPoints(selectedUid, selectedStat.team, v)}>
+                  +{v}
+                </button>
+              ))}
+            </div>
+            <div className={styles.pointFixes}>
+              <span>Corrigir:</span>
+              <button
+                className={styles.minusButton}
+                disabled={selectedStat.points === 0}
+                onClick={() => addPoints(selectedUid, selectedStat.team, -1)}
+              >
+                −1
+              </button>
+              <button
+                className={styles.minusButton}
+                disabled={!selectedStat.threePointers}
+                onClick={() => undoThreePointer(selectedUid, selectedStat.team)}
+                title="Desfaz uma cesta de 3"
+              >
+                −3
+              </button>
+            </div>
+
+            {/* Estatísticas: grade 2×2 */}
+            <div className={styles.statGrid}>
+              {STAT_FIELDS.map((field) => (
+                <div className={styles.statCell} key={field.key}>
+                  <span className={styles.statCellLabel}>
+                    {field.label} <b>{selectedStat[field.key]}</b>
+                  </span>
+                  <div className={styles.statCellButtons}>
+                    <button
+                      className={styles.minusButton}
+                      disabled={selectedStat[field.key] === 0}
+                      onClick={() => addStat(selectedUid, field.key, -1)}
+                      aria-label={`${field.label} −1`}
+                    >
+                      −
+                    </button>
+                    <button
+                      className={styles.plusButton}
+                      onClick={() => addStat(selectedUid, field.key, 1)}
+                      aria-label={`${field.label} +1`}
+                    >
+                      +
+                    </button>
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
+
+            {lastAction && (
+              <button type="button" className={styles.drawerUndo} onClick={undoLastAction} disabled={undoing}>
+                <Undo2 size={14} /> Desfazer: {describeAction(lastAction)} {nameOf(lastAction.uid)}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* CONFIRMAR ENCERRAMENTO */}
+      {confirmFinish && (
+        <div className={styles.drawerOverlay} onClick={() => setConfirmFinish(false)}>
+          <div className={styles.confirmDialog} onClick={(e) => e.stopPropagation()} role="alertdialog">
+            <h3>Encerrar o jogo?</h3>
+            <p>
+              {game.teamA.name} <b>{game.teamA.score}</b> × <b>{game.teamB.score}</b> {game.teamB.name}
+            </p>
+            <span className={styles.confirmHint}>
+              O placar e as estatísticas ficam salvos e entram no ranking. Não dá para voltar ao jogo depois.
+            </span>
+            <div className={styles.confirmActions}>
+              <button type="button" className={styles.confirmCancel} onClick={() => setConfirmFinish(false)}>
+                Continuar jogando
+              </button>
+              <button type="button" className={styles.confirmFinish} onClick={finishGame}>
+                Encerrar
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -768,7 +945,27 @@ export default function GamePage() {
   )
 }
 
-function TeamSection({ title, rows, editable, onSelect, accent, styles }) {
+function SetupChip({ player, team, onClick, styles }) {
+  const name = displayName(player)
+  return (
+    <button
+      type="button"
+      className={`${styles.setupChip} ${team === 'A' ? styles.setupChipA : team === 'B' ? styles.setupChipB : ''}`}
+      onClick={onClick}
+    >
+      {player.photoURL ? (
+        <Image src={player.photoURL} alt={name} width={28} height={28} className={styles.playerAvatar} />
+      ) : (
+        <span className={styles.avatarFallback}>{name.charAt(0)}</span>
+      )}
+      <span className={styles.playerName}>{name}</span>
+    </button>
+  )
+}
+
+
+function TeamSection({ title, rows, editable, onSelect, accent, mvpUids = [], styles }) {
+  const total = (key) => rows.reduce((acc, r) => acc + (r[key] || 0), 0)
   return (
     <section className={styles.teamSection}>
       <h2 className={`${styles.teamTitle} ${accent ? styles.teamTitleAccent : ''}`}>{title}</h2>
@@ -805,6 +1002,11 @@ function TeamSection({ title, rows, editable, onSelect, accent, styles }) {
               <span className={styles.playerName}>
                 {row.player.nickname || row.player.name || 'Jogador'}
               </span>
+              {mvpUids.includes(row.uid) && (
+                <span className={styles.mvpTag} title="MVP da partida" aria-label="MVP da partida">
+                  ★
+                </span>
+              )}
             </span>
             <span className={styles.statValuePrimary}>{row.points}</span>
             <span>{row.rebounds}</span>
@@ -813,6 +1015,17 @@ function TeamSection({ title, rows, editable, onSelect, accent, styles }) {
             <span>{row.steals}</span>
           </button>
         ))
+      )}
+
+      {rows.length > 1 && (
+        <div className={styles.totalRow}>
+          <span className={styles.statsHeaderName}>Total</span>
+          <span className={styles.statValuePrimary}>{total('points')}</span>
+          <span>{total('rebounds')}</span>
+          <span>{total('assists')}</span>
+          <span>{total('blocks')}</span>
+          <span>{total('steals')}</span>
+        </div>
       )}
     </section>
   )

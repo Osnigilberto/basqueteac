@@ -1,422 +1,226 @@
-    'use client'
+'use client'
 
-    import { useEffect, useRef, useState } from 'react'
-    import { useRouter } from 'next/navigation'
-    import Image from 'next/image'
-    import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore'
-    import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
-    import { ArrowLeft, CheckCircle2, HelpCircle, Loader2 } from 'lucide-react'
-    import { useAuth } from '@/hooks/useAuth'
-    import { db, storage } from '@/lib/firebase'
-    import BottomNav from '@/components/BottomNav/BottomNav'
-    import styles from './page.module.css'
+import { useEffect, useState } from 'react'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import Image from 'next/image'
+import { doc, getDoc } from 'firebase/firestore'
+import { signOut } from 'firebase/auth'
+import { Pencil, Moon, Sun, LogOut, ChevronRight, Medal, TrendingUp, Target, Settings } from 'lucide-react'
+import { useAuth } from '@/hooks/useAuth'
+import { useTheme } from '@/hooks/useTheme'
+import { auth, db } from '@/lib/firebase'
+import { POSITION_LABELS, calculateAge, displayName } from '@/lib/format'
+import { fetchGroupData, playerGameLog, computeAverages } from '@/lib/gameStats'
+import { SHOT_ZONES, formatShotLine, shotPct } from '@/lib/biomechanics'
+import { TOTAL_STARS, computeProgress } from '@/lib/challenges'
+import {
+  cachedTrainingStats,
+  loadTrainingSessions,
+  cachedChallengeBest,
+  loadChallengeBest,
+} from '@/lib/trainingStore'
+import BottomNav from '@/components/BottomNav/BottomNav'
+import AchievementBadges from '@/components/AchievementBadges/AchievementBadges'
+import styles from './page.module.css'
 
-    const POSITIONS = [
-    {
-        id: 'PG',
-        label: 'Armador',
-        description: 'Organiza o ataque, fica com a bola na mão na maior parte do tempo e inicia as jogadas.',
-    },
-    {
-        id: 'SG',
-        label: 'Ala-Armador',
-        description: 'Versátil pela quadra, costuma ser bom arremessador e também ajuda a armar jogadas.',
-    },
-    {
-        id: 'SF',
-        label: 'Ala',
-        description: 'Equilíbrio entre ataque e defesa, joga tanto por dentro quanto por fora.',
-    },
-    {
-        id: 'PF',
-        label: 'Ala-Pivô',
-        description: 'Joga mais próximo da cesta, disputa rebotes e ajuda no garrafão.',
-    },
-    {
-        id: 'C',
-        label: 'Pivô',
-        description: 'Fica perto da cesta, disputa rebotes e ajuda a proteger o garrafão dos arremessos adversários.',
-    },
-    ]
+/**
+ * Central do atleta: cartão do jogador, números da carreira, treinos,
+ * conquistas e configurações num só lugar. A edição fica em /profile/edit.
+ */
+export default function ProfilePage() {
+  const router = useRouter()
+  const { user, loading } = useAuth()
+  const [theme, applyTheme] = useTheme()
 
-    // Calcula idade a partir da data de nascimento (string 'YYYY-MM-DD')
-    function calculateAge(birthDateStr) {
-    if (!birthDateStr) return null
-    const birthDate = new Date(birthDateStr)
-    const today = new Date()
-    let age = today.getFullYear() - birthDate.getFullYear()
-    const hasNotHadBirthdayThisYear =
-        today.getMonth() < birthDate.getMonth() ||
-        (today.getMonth() === birthDate.getMonth() && today.getDate() < birthDate.getDate())
-    if (hasNotHadBirthdayThisYear) age -= 1
-    return age
+  const [profile, setProfile] = useState(null)
+  const [career, setCareer] = useState(undefined) // undefined = carregando, null = sem jogos
+  const [training, setTraining] = useState(null)
+  const [challengeBest, setChallengeBest] = useState({})
+
+  useEffect(() => {
+    if (!loading && !user) router.push('/')
+  }, [loading, user, router])
+
+  useEffect(() => {
+    if (!user) return
+    async function load() {
+      setTraining(cachedTrainingStats(user.uid))
+      setChallengeBest(cachedChallengeBest(user.uid))
+
+      getDoc(doc(db, 'users', user.uid))
+        .then((snap) => setProfile(snap.exists() ? snap.data() : {}))
+        .catch((err) => console.error('[profile → perfil]', err))
+
+      fetchGroupData()
+        .then(({ games }) => setCareer(computeAverages(playerGameLog(games, user.uid))))
+        .catch((err) => {
+          console.error('[profile → carreira]', err)
+          setCareer(null)
+        })
+
+      loadTrainingSessions(user.uid).then((history) => history && setTraining(history.stats))
+      setChallengeBest(await loadChallengeBest(user.uid))
     }
+    load()
+  }, [user])
 
-    // Recorta a imagem no centro em formato quadrado e redimensiona antes de
-    // enviar — deixa o arquivo bem mais leve e sempre quadrado, sem precisar
-    // de nenhuma interface de recorte manual
-    function cropAndResizeImage(file, size = 480) {
-    return new Promise((resolve, reject) => {
-        const img = new window.Image()
-        const url = URL.createObjectURL(file)
+  if (loading || !user) return null
 
-        img.onload = () => {
-        const minSide = Math.min(img.width, img.height)
-        const sx = (img.width - minSide) / 2
-        const sy = (img.height - minSide) / 2
+  const name = displayName(profile) === 'Jogador' ? user.displayName || 'Jogador' : displayName(profile)
+  const fullName = profile?.nickname ? profile?.name : null
+  const photo = profile?.photoURL || user.photoURL
+  const age = calculateAge(profile?.birthDate)
+  const meta = [
+    age != null && `${age} anos`,
+    profile?.height && `${(profile.height / 100).toFixed(2).replace('.', ',')} m`,
+    profile?.weight && `${profile.weight} kg`,
+    profile?.city,
+  ].filter(Boolean)
 
-        const canvas = document.createElement('canvas')
-        canvas.width = size
-        canvas.height = size
-        const ctx = canvas.getContext('2d')
-        ctx.drawImage(img, sx, sy, minSide, minSide, 0, 0, size, size)
+  const stars = computeProgress(challengeBest).totalStars
+  const zoneLines = SHOT_ZONES.filter((z) => training?.zones?.[z.id]?.attempts > 0)
 
-        canvas.toBlob(
-            (blob) => {
-            URL.revokeObjectURL(url)
-            if (blob) resolve(blob)
-            else reject(new Error('Falha ao gerar a imagem'))
-            },
-            'image/jpeg',
-            0.85
-        )
-        }
-
-        img.onerror = () => {
-        URL.revokeObjectURL(url)
-        reject(new Error('Falha ao carregar a imagem'))
-        }
-
-        img.src = url
-    })
-    }
-
-    export default function Profile() {
-    const router = useRouter()
-    const { user, loading } = useAuth()
-
-    // Estado do formulário
-    const [form, setForm] = useState({
-        name: '',
-        nickname: '',
-        city: '',
-        birthDate: '',
-        height: '',
-        weight: '',
-        positions: [],
-        photoURL: '',
-    })
-    const [loadingProfile, setLoadingProfile] = useState(true)
-    const [saving, setSaving] = useState(false)
-    const [saved, setSaved] = useState(false)
-    const [uploadingPhoto, setUploadingPhoto] = useState(false)
-
-    // Controla qual tooltip de posição está aberto (só um por vez)
-    const [infoOpen, setInfoOpen] = useState(null)
-    const positionsRef = useRef(null)
-    const fileInputRef = useRef(null)
-
-    // Protege a rota: sem usuário logado, volta pra landing
-    useEffect(() => {
-        if (!loading && !user) router.push('/')
-    }, [loading, user, router])
-
-    // Carrega os dados salvos do Firestore pra preencher o formulário
-    useEffect(() => {
-        if (!user) return
-
-        async function loadProfile() {
-        const ref = doc(db, 'users', user.uid)
-        const snap = await getDoc(ref)
-
-        if (snap.exists()) {
-            const data = snap.data()
-            setForm({
-            name: data.name ?? user.displayName ?? '',
-            nickname: data.nickname ?? '',
-            city: data.city ?? '',
-            birthDate: data.birthDate ?? '',
-            height: data.height ?? '',
-            weight: data.weight ?? '',
-            positions: data.positions ?? [],
-            photoURL: data.photoURL || user.photoURL || '',
-            })
-        } else {
-            setForm((prev) => ({
-            ...prev,
-            name: user.displayName ?? '',
-            photoURL: user.photoURL ?? '',
-            }))
-        }
-        setLoadingProfile(false)
-        }
-
-        loadProfile()
-    }, [user])
-
-    // Fecha o tooltip de posição ao clicar fora da área de posições
-    useEffect(() => {
-        function handleClickOutside(event) {
-        if (positionsRef.current && !positionsRef.current.contains(event.target)) {
-            setInfoOpen(null)
-        }
-        }
-        document.addEventListener('mousedown', handleClickOutside)
-        return () => document.removeEventListener('mousedown', handleClickOutside)
-    }, [])
-
-    // Marca/desmarca uma posição no array de posições selecionadas
-    function togglePosition(id) {
-        setForm((prev) => ({
-        ...prev,
-        positions: prev.positions.includes(id)
-            ? prev.positions.filter((p) => p !== id)
-            : [...prev.positions, id],
-        }))
-    }
-
-    // Salva a foto direto no Firestore assim que o upload termina —
-    // não espera o botão "Salvar perfil", pra não perder o upload se
-    // a pessoa sair da página antes de salvar o resto do formulário
-    async function savePhoto(url) {
-        setForm((prev) => ({ ...prev, photoURL: url }))
-        const ref = doc(db, 'users', user.uid)
-        await setDoc(ref, { photoURL: url, updatedAt: serverTimestamp() }, { merge: true })
-    }
-
-    // Pega o arquivo escolhido, recorta/redimensiona, sobe pro Firebase
-    // Storage (sempre no mesmo caminho — sobrescreve a foto anterior em
-    // vez de acumular arquivos antigos) e salva a URL final no perfil
-    async function handlePhotoSelected(event) {
-        const file = event.target.files?.[0]
-        event.target.value = '' // permite escolher o mesmo arquivo de novo depois, se quiser
-        if (!file) return
-
-        if (!file.type.startsWith('image/')) {
-        alert('Escolhe um arquivo de imagem (JPG ou PNG).')
-        return
-        }
-        if (file.size > 8_000_000) {
-        alert('Imagem muito grande — escolhe uma de até 8MB.')
-        return
-        }
-
-        setUploadingPhoto(true)
-        try {
-        const blob = await cropAndResizeImage(file)
-        const storageRef = ref(storage, `avatars/${user.uid}/profile.jpg`)
-        await uploadBytes(storageRef, blob, { contentType: 'image/jpeg' })
-        const url = await getDownloadURL(storageRef)
-        await savePhoto(url)
-        } catch (error) {
-        console.error('[handlePhotoSelected]', error)
-        alert('Não foi possível enviar a foto. Tenta de novo.')
-        } finally {
-        setUploadingPhoto(false)
-        }
-    }
-
-    // Salva todos os campos do formulário no Firestore
-    async function handleSave(event) {
-        event.preventDefault()
-        setSaving(true)
-
-        const ref = doc(db, 'users', user.uid)
-        await setDoc(
-        ref,
-        {
-            name: form.name,
-            nickname: form.nickname,
-            city: form.city,
-            birthDate: form.birthDate,
-            height: form.height ? Number(form.height) : null,
-            weight: form.weight ? Number(form.weight) : null,
-            positions: form.positions,
-            updatedAt: serverTimestamp(),
-        },
-        { merge: true }
-        )
-
-        setSaving(false)
-        setSaved(true)
-
-        // Mostra o toast por um instante antes de voltar pro dashboard
-        setTimeout(() => {
-        router.push('/dashboard')
-        }, 1200)
-    }
-
-    // Evita "flash" de conteúdo antes de confirmar login + carregar dados
-    if (loading || !user || loadingProfile) return null
-
-    const age = calculateAge(form.birthDate)
-
-    return (
-        <main className={styles.page}>
-        <header className={styles.header}>
-            <button className={styles.backButton} onClick={() => router.push('/dashboard')}>
-            <ArrowLeft size={18} />
-            </button>
-            <div className={styles.logo}>
-            Basquete<span className={styles.logoAccent}>AC</span>
-            </div>
-        </header>
-
-        <div className={styles.content}>
-            <h1 className={styles.title}>Meu perfil</h1>
-
-            <div className={styles.avatarRow}>
-            {form.photoURL && (
-                <Image
-                src={form.photoURL}
-                alt={form.name || user.displayName}
-                width={72}
-                height={72}
-                className={styles.avatar}
-                />
-            )}
-            <div className={styles.avatarActions}>
-                <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                className={styles.hiddenFileInput}
-                onChange={handlePhotoSelected}
-                />
-                <button
-                type="button"
-                className={styles.changePhotoButton}
-                onClick={() => fileInputRef.current?.click()}
-                disabled={uploadingPhoto}
-                >
-                {uploadingPhoto && <Loader2 size={16} className={styles.spin} />}
-                {uploadingPhoto ? 'Enviando...' : 'Alterar foto'}
-                </button>
-                <p className={styles.avatarHint}>JPG ou PNG, recortado em quadrado.</p>
-            </div>
-            </div>
-
-            <form className={styles.form} onSubmit={handleSave}>
-            <label className={styles.field}>
-                <span className={styles.label}>Nome completo</span>
-                <input
-                className={styles.input}
-                type="text"
-                value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
-                placeholder="Seu nome completo"
-                />
-            </label>
-
-            <label className={styles.field}>
-                <span className={styles.label}>Apelido</span>
-                <input
-                className={styles.input}
-                type="text"
-                value={form.nickname}
-                onChange={(e) => setForm({ ...form, nickname: e.target.value })}
-                placeholder="Como te chamam na quadra"
-                />
-            </label>
-
-            <label className={styles.field}>
-                <span className={styles.label}>Cidade</span>
-                <input
-                className={styles.input}
-                type="text"
-                value={form.city}
-                onChange={(e) => setForm({ ...form, city: e.target.value })}
-                placeholder="Sua cidade"
-                />
-            </label>
-
-            <label className={styles.field}>
-                <span className={styles.label}>Data de nascimento</span>
-                <input
-                className={styles.input}
-                type="date"
-                value={form.birthDate}
-                onChange={(e) => setForm({ ...form, birthDate: e.target.value })}
-                />
-                {age !== null && <p className={styles.fieldHint}>{age} anos</p>}
-            </label>
-
-            <div className={styles.row}>
-                <label className={styles.field}>
-                <span className={styles.label}>Altura (cm)</span>
-                <input
-                    className={styles.input}
-                    type="number"
-                    min={100}
-                    max={250}
-                    value={form.height}
-                    onChange={(e) => setForm({ ...form, height: e.target.value })}
-                    placeholder="178"
-                />
-                </label>
-
-                <label className={styles.field}>
-                <span className={styles.label}>Peso (kg)</span>
-                <input
-                    className={styles.input}
-                    type="number"
-                    min={30}
-                    max={200}
-                    value={form.weight}
-                    onChange={(e) => setForm({ ...form, weight: e.target.value })}
-                    placeholder="75"
-                />
-                </label>
-            </div>
-
-            <div className={styles.field}>
-                <span className={styles.label}>Posições</span>
-                <div className={styles.checkboxGrid} ref={positionsRef}>
-                {POSITIONS.map((position) => (
-                    <div key={position.id} className={styles.checkboxOption}>
-                    <label className={styles.checkboxLabel}>
-                        <input
-                        type="checkbox"
-                        checked={form.positions.includes(position.id)}
-                        onChange={() => togglePosition(position.id)}
-                        />
-                        {position.label} <span className={styles.positionAbbr}>({position.id})</span>
-                    </label>
-
-                    <button
-                        type="button"
-                        className={styles.infoButton}
-                        aria-label={`O que faz ${position.label}`}
-                        onClick={() => setInfoOpen(infoOpen === position.id ? null : position.id)}
-                    >
-                        <HelpCircle size={16} />
-                    </button>
-
-                    {infoOpen === position.id && (
-                        <div className={styles.infoTooltip} role="tooltip">
-                        {position.description}
-                        </div>
-                    )}
-                    </div>
-                ))}
-                </div>
-            </div>
-
-            <button className={styles.saveButton} type="submit" disabled={saving || saved}>
-                {saving && <Loader2 size={16} className={styles.spin} />}
-                {saving ? 'Salvando...' : 'Salvar perfil'}
-            </button>
-            </form>
+  return (
+    <main className={styles.page}>
+      <header className={styles.header}>
+        <div className={styles.logo}>
+          Basquete<span className={styles.logoAccent}>AC</span>
         </div>
+      </header>
 
-        {saved && (
-            <div className={styles.toast} role="status">
-            <CheckCircle2 size={18} />
-            Perfil salvo!
+      <div className={styles.content}>
+        {/* CARTÃO DO JOGADOR */}
+        <section className={styles.playerCard}>
+          <div className={styles.playerTop}>
+            {photo ? (
+              <Image src={photo} alt={name} width={76} height={76} className={styles.avatar} />
+            ) : (
+              <span className={styles.avatarFallback}>{name.charAt(0)}</span>
+            )}
+            <div className={styles.playerNames}>
+              <h1>{name}</h1>
+              {fullName && <span className={styles.fullName}>{fullName}</span>}
+              {meta.length > 0 && <span className={styles.meta}>{meta.join(' · ')}</span>}
             </div>
-        )}
+          </div>
 
-        <BottomNav />
-        </main>
-    )
-    }
+          {profile?.positions?.length > 0 && (
+            <div className={styles.positions}>
+              {profile.positions.map((p) => (
+                <span key={p} className={styles.positionChip}>
+                  {POSITION_LABELS[p] || p} <small>{p}</small>
+                </span>
+              ))}
+            </div>
+          )}
+
+          <Link href="/profile/edit" className={styles.editButton}>
+            <Pencil size={14} /> Editar perfil
+          </Link>
+        </section>
+
+        {/* CARREIRA */}
+        <section className={styles.card}>
+          <div className={styles.cardHeader}>
+            <TrendingUp size={14} /> CARREIRA
+            <Link href="/stats" className={styles.cardLink}>
+              Ver stats <ChevronRight size={14} />
+            </Link>
+          </div>
+          {career === undefined ? (
+            <p className={styles.emptyText}>Carregando...</p>
+          ) : career === null ? (
+            <p className={styles.emptyText}>Você ainda não tem jogos finalizados.</p>
+          ) : (
+            <div className={styles.numbers}>
+              <Stat value={career.games} label="Jogos" />
+              <Stat value={career.wins} label="Vitórias" />
+              <Stat value={career.mvps} label="MVPs" />
+              <Stat value={career.points.toFixed(1)} label="PPG" accent />
+              <Stat value={career.rebounds.toFixed(1)} label="RPG" accent />
+              <Stat value={career.assists.toFixed(1)} label="APG" accent />
+            </div>
+          )}
+        </section>
+
+        {/* TREINOS */}
+        <section className={styles.card}>
+          <div className={styles.cardHeader}>
+            <Target size={14} /> TREINOS
+            <Link href="/training" className={styles.cardLink}>
+              Treinar <ChevronRight size={14} />
+            </Link>
+          </div>
+          <div className={styles.numbers}>
+            <Stat value={training?.count || 0} label="Treinos" />
+            <Stat value={training?.reps || 0} label="Repetições" />
+            <Stat value={`${stars}/${TOTAL_STARS}`} label="★ Desafios" />
+          </div>
+          {zoneLines.length > 0 && (
+            <div className={styles.zoneLines}>
+              {zoneLines.map((z) => {
+                const { makes, attempts } = training.zones[z.id]
+                return (
+                  <span key={z.id} className={styles.zoneLine}>
+                    <b>{z.id}</b> {formatShotLine(makes, attempts)} <em>{shotPct(makes, attempts)}%</em>
+                  </span>
+                )
+              })}
+            </div>
+          )}
+        </section>
+
+        {/* CONQUISTAS */}
+        <section className={styles.card} id="conquistas">
+          <div className={styles.cardHeader}>
+            <Medal size={14} /> CONQUISTAS
+          </div>
+          <AchievementBadges uid={user.uid} />
+        </section>
+
+        {/* CONFIGURAÇÕES */}
+        <section className={styles.card} id="configuracoes">
+          <div className={styles.cardHeader}>
+            <Settings size={14} /> CONFIGURAÇÕES
+          </div>
+
+          <span className={styles.settingLabel}>Aparência</span>
+          <div className={styles.themeOptions}>
+            <button
+              type="button"
+              className={`${styles.themeButton} ${theme === 'dark' ? styles.themeButtonActive : ''}`}
+              onClick={() => applyTheme('dark')}
+            >
+              <Moon size={16} /> Escuro
+            </button>
+            <button
+              type="button"
+              className={`${styles.themeButton} ${theme === 'light' ? styles.themeButtonActive : ''}`}
+              onClick={() => applyTheme('light')}
+            >
+              <Sun size={16} /> Claro
+            </button>
+          </div>
+
+          <span className={styles.settingLabel}>Conta</span>
+          <span className={styles.accountEmail}>{user.email}</span>
+          <button type="button" className={styles.signOutButton} onClick={() => signOut(auth)}>
+            <LogOut size={16} /> Sair
+          </button>
+        </section>
+      </div>
+
+      <BottomNav />
+    </main>
+  )
+}
+
+function Stat({ value, label, accent }) {
+  return (
+    <div className={styles.number}>
+      <span className={`${styles.numberValue} ${accent ? styles.numberAccent : ''}`}>{value}</span>
+      <span className={styles.numberLabel}>{label}</span>
+    </div>
+  )
+}

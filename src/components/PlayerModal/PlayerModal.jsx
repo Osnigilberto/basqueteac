@@ -2,177 +2,55 @@
 
     import { useEffect, useMemo, useState } from 'react'
     import Image from 'next/image'
-    import { collection, collectionGroup, doc, getDoc, getDocs, query, where } from 'firebase/firestore'
-    import { X, TrendingUp, ArrowLeftRight, Medal, ChevronLeft, ChevronRight } from 'lucide-react'
-    import { db } from '@/lib/firebase'
+    import { X, TrendingUp, ArrowLeftRight, Medal } from 'lucide-react'
     import { useAuth } from '@/hooks/useAuth'
+    import { usePeriod } from '@/hooks/usePeriod'
+    import { POSITION_LABELS, calculateAge, formatShortDate } from '@/lib/format'
+    import { fetchGroupData, playerGameLog, computeAverages } from '@/lib/gameStats'
     import AchievementBadges from '@/components/AchievementBadges/AchievementBadges'
+    import PeriodPicker from '@/components/PeriodPicker/PeriodPicker'
     import styles from './PlayerModal.module.css'
 
-    const POSITION_LABELS = {
-    PG: 'Armador',
-    SG: 'Ala-Armador',
-    SF: 'Ala',
-    PF: 'Ala-Pivô',
-    C: 'Pivô',
+    // Confrontos diretos (times opostos) entre o usuário logado e `uid`
+    function headToHeadMatches(games, myUid, uid) {
+    const matches = []
+    games.forEach((game) => {
+        const meInA = game.teamA.players.includes(myUid)
+        const meInB = game.teamB.players.includes(myUid)
+        const themInA = game.teamA.players.includes(uid)
+        const themInB = game.teamB.players.includes(uid)
+        if (!((meInA && themInB) || (meInB && themInA))) return
+        const myScore = meInA ? game.teamA.score : game.teamB.score
+        const theirScore = meInA ? game.teamB.score : game.teamA.score
+        matches.push({ gameId: game.id, date: game.date, myScore, theirScore, won: myScore > theirScore })
+    })
+    return {
+        winsMe: matches.filter((m) => m.won).length,
+        winsThem: matches.filter((m) => !m.won).length,
+        matches,
     }
-
-    function calculateAge(birthDateStr) {
-    if (!birthDateStr) return null
-    const birthDate = new Date(birthDateStr)
-    const today = new Date()
-    let age = today.getFullYear() - birthDate.getFullYear()
-    const hasNotHadBirthdayThisYear =
-        today.getMonth() < birthDate.getMonth() ||
-        (today.getMonth() === birthDate.getMonth() && today.getDate() < birthDate.getDate())
-    if (hasNotHadBirthdayThisYear) age -= 1
-    return age
-    }
-
-    function formatShortDate(timestamp) {
-    const date = timestamp.toDate()
-    const dateStr = date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
-    const timeStr = date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
-    return `${dateStr} · ${timeStr}`
-    }
-
-    function capitalize(text) {
-    return text.charAt(0).toUpperCase() + text.slice(1)
     }
 
     export default function PlayerModal({ uid, onClose }) {
     const { user: currentUser } = useAuth()
+    const period = usePeriod()
 
-    const [profile, setProfile] = useState(null)
-    const [loadingProfile, setLoadingProfile] = useState(true)
-    const [gameLog, setGameLog] = useState([])
-    const [loadingStats, setLoadingStats] = useState(true)
-    const [period, setPeriod] = useState('month') // 'month' | 'season'
-    const [viewDate, setViewDate] = useState(() => new Date())
-
-    const [headToHead, setHeadToHead] = useState(null)
-    const [loadingH2H, setLoadingH2H] = useState(true)
+    // Dados do grupo em cache (os mesmos do Início/Stats): perfis, histórico e confrontos
+    const [group, setGroup] = useState(null)
 
     useEffect(() => {
         if (!uid) return
-
-        async function loadProfile() {
-        try {
-            const snap = await getDoc(doc(db, 'users', uid))
-            setProfile(snap.exists() ? snap.data() : null)
-        } catch (error) {
-            console.error('[PlayerModal → loadProfile]', error)
-        } finally {
-            setLoadingProfile(false)
+        let active = true
+        fetchGroupData()
+        .then((data) => active && setGroup(data))
+        .catch((error) => {
+            console.error('[PlayerModal → fetchGroupData]', error)
+            if (active) setGroup({ games: [], profiles: {} })
+        })
+        return () => {
+        active = false
         }
-        }
-
-        loadProfile()
     }, [uid])
-
-    // Busca uma vez só todo o histórico do jogador (já vem com a data do jogo).
-    // A navegação por mês/temporada é feita em memória depois, sem leituras extras.
-    useEffect(() => {
-        if (!uid) return
-
-        async function fetchGameLog() {
-        try {
-            const statsQuery = query(collectionGroup(db, 'stats'), where('uid', '==', uid))
-            const snap = await getDocs(statsQuery)
-
-            const entries = await Promise.all(
-            snap.docs.map(async (statDoc) => {
-                try {
-                const gameRef = statDoc.ref.parent.parent
-                const gameSnap = await getDoc(gameRef)
-                if (!gameSnap.exists() || gameSnap.data().status !== 'finished') return null
-
-                const game = gameSnap.data()
-                const data = statDoc.data()
-                const isTeamA = data.team === 'A'
-                const ownTeam = isTeamA ? game.teamA : game.teamB
-                const oppTeam = isTeamA ? game.teamB : game.teamA
-
-                return {
-                    gameId: gameRef.id,
-                    date: game.date,
-                    ownTeamName: ownTeam.name,
-                    oppTeamName: oppTeam.name,
-                    points: data.points || 0,
-                    rebounds: data.rebounds || 0,
-                    assists: data.assists || 0,
-                    blocks: data.blocks || 0,
-                    steals: data.steals || 0,
-                    plusMinus: ownTeam.score - oppTeam.score,
-                }
-                } catch (innerError) {
-                console.error('[PlayerModal → getDoc do jogo]', innerError)
-                return null
-                }
-            })
-            )
-
-            const validEntries = entries.filter(Boolean).sort((a, b) => b.date.toMillis() - a.date.toMillis())
-            setGameLog(validEntries)
-        } catch (error) {
-            console.error('[PlayerModal → query principal]', error)
-        } finally {
-            setLoadingStats(false)
-        }
-        }
-
-        fetchGameLog()
-    }, [uid])
-
-    useEffect(() => {
-        async function fetchHeadToHead() {
-        if (!uid || !currentUser || uid === currentUser.uid) {
-            setLoadingH2H(false)
-            return
-        }
-
-        try {
-            const gamesSnap = await getDocs(query(collection(db, 'games'), where('status', '==', 'finished')))
-
-            const matches = []
-            gamesSnap.docs.forEach((gameDoc) => {
-            const game = gameDoc.data()
-            const meInA = game.teamA.players.includes(currentUser.uid)
-            const meInB = game.teamB.players.includes(currentUser.uid)
-            const themInA = game.teamA.players.includes(uid)
-            const themInB = game.teamB.players.includes(uid)
-
-            const opposed = (meInA && themInB) || (meInB && themInA)
-            if (!opposed) return
-
-            const myScore = meInA ? game.teamA.score : game.teamB.score
-            const theirScore = meInA ? game.teamB.score : game.teamA.score
-
-            matches.push({
-                gameId: gameDoc.id,
-                date: game.date,
-                myScore,
-                theirScore,
-                won: myScore > theirScore,
-            })
-            })
-
-            matches.sort((a, b) => b.date.toMillis() - a.date.toMillis())
-
-            setHeadToHead({
-            winsMe: matches.filter((m) => m.won).length,
-            winsThem: matches.filter((m) => !m.won).length,
-            matches,
-            })
-        } catch (error) {
-            console.error('[PlayerModal → headToHead]', error)
-        } finally {
-            setLoadingH2H(false)
-        }
-        }
-
-        fetchHeadToHead()
-    }, [uid, currentUser])
 
     useEffect(() => {
         function handleEscape(event) {
@@ -182,63 +60,26 @@
         return () => document.removeEventListener('keydown', handleEscape)
     }, [onClose])
 
-    function changePeriod(next) {
-        setPeriod(next)
-        setViewDate(new Date()) // volta pro período atual ao trocar de modo
-    }
-
-    function goPrev() {
-        setViewDate((prev) => {
-        const d = new Date(prev)
-        if (period === 'month') d.setMonth(d.getMonth() - 1)
-        else d.setFullYear(d.getFullYear() - 1)
-        return d
-        })
-    }
-
-    function goNext() {
-        setViewDate((prev) => {
-        const d = new Date(prev)
-        if (period === 'month') d.setMonth(d.getMonth() + 1)
-        else d.setFullYear(d.getFullYear() + 1)
-        return d
-        })
-    }
-
-    const now = new Date()
-    const isAtPresent =
-        period === 'month'
-        ? viewDate.getMonth() === now.getMonth() && viewDate.getFullYear() === now.getFullYear()
-        : viewDate.getFullYear() === now.getFullYear()
-
-    const periodLabel =
-        period === 'month'
-        ? capitalize(viewDate.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }))
-        : `${viewDate.getFullYear()}`
+    const loadingProfile = !group
+    const loadingStats = !group
+    const loadingH2H = !group
+    const profile = group ? group.profiles[uid] || null : null
+    const gameLog = useMemo(() => (group ? playerGameLog(group.games, uid) : []), [group, uid])
+    const headToHead = useMemo(
+        () => (group && currentUser && uid !== currentUser.uid ? headToHeadMatches(group.games, currentUser.uid, uid) : null),
+        [group, currentUser, uid]
+    )
 
     // Filtra o histórico já carregado pelo mês/ano selecionado — sem novas queries.
-    const filteredLog = useMemo(() => {
-        return gameLog.filter((g) => {
-        const d = g.date.toDate()
-        if (period === 'month') {
-            return d.getMonth() === viewDate.getMonth() && d.getFullYear() === viewDate.getFullYear()
-        }
-        return d.getFullYear() === viewDate.getFullYear()
-        })
-    }, [gameLog, period, viewDate])
-
+    const { inPeriod } = period
+    const filteredLog = useMemo(
+        () => gameLog.filter((g) => inPeriod(g.date)),
+        // inPeriod muda junto com period/viewDate
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        [gameLog, period.period, period.viewDate]
+    )
+    const averages = computeAverages(filteredLog)
     const gamesPlayed = filteredLog.length
-    const averages =
-        gamesPlayed > 0
-        ? {
-            points: filteredLog.reduce((s, g) => s + g.points, 0) / gamesPlayed,
-            rebounds: filteredLog.reduce((s, g) => s + g.rebounds, 0) / gamesPlayed,
-            assists: filteredLog.reduce((s, g) => s + g.assists, 0) / gamesPlayed,
-            blocks: filteredLog.reduce((s, g) => s + g.blocks, 0) / gamesPlayed,
-            steals: filteredLog.reduce((s, g) => s + g.steals, 0) / gamesPlayed,
-            plusMinus: filteredLog.reduce((s, g) => s + g.plusMinus, 0) / gamesPlayed,
-            }
-        : null
 
     const displayName = profile?.nickname || profile?.name || 'Jogador'
     const showHeadToHead = currentUser && uid !== currentUser.uid
@@ -294,46 +135,10 @@
 
                 <div className={styles.listHeader}>
                 <TrendingUp size={14} />
-                MÉDIAS {period === 'month' ? 'DO MÊS' : 'DA TEMPORADA'}
+                MÉDIAS {period.period === 'month' ? 'DO MÊS' : 'DA TEMPORADA'}
                 </div>
 
-                <div className={styles.periodToggle}>
-                <button
-                    type="button"
-                    className={`${styles.periodButton} ${period === 'month' ? styles.periodButtonActive : ''}`}
-                    onClick={() => changePeriod('month')}
-                >
-                    Mensal
-                </button>
-                <button
-                    type="button"
-                    className={`${styles.periodButton} ${period === 'season' ? styles.periodButtonActive : ''}`}
-                    onClick={() => changePeriod('season')}
-                >
-                    Temporada
-                </button>
-                </div>
-
-                <div className={styles.periodNav}>
-                <button
-                    type="button"
-                    className={styles.periodNavButton}
-                    onClick={goPrev}
-                    aria-label="Período anterior"
-                >
-                    <ChevronLeft size={18} />
-                </button>
-                <span className={styles.periodNavLabel}>{periodLabel}</span>
-                <button
-                    type="button"
-                    className={styles.periodNavButton}
-                    onClick={goNext}
-                    disabled={isAtPresent}
-                    aria-label="Próximo período"
-                >
-                    <ChevronRight size={18} />
-                </button>
-                </div>
+                <PeriodPicker period={period} />
 
                 {loadingStats ? (
                 <p className={styles.emptyText}>Carregando...</p>
@@ -412,7 +217,7 @@
                 </>
                 ) : (
                 <p className={styles.emptyText}>
-                    {period === 'month'
+                    {period.period === 'month'
                     ? 'Nenhum jogo neste mês.'
                     : 'Nenhum jogo nesta temporada.'}
                 </p>

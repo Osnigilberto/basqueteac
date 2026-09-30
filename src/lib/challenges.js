@@ -377,3 +377,17 @@ export function mergeBest(bestById, challenge, { value, stars }) {
     },
   }
 }
+
+/**
+ * Desafio sugerido do dia: entre os fundamentos que ainda têm um próximo
+ * desafio, faz um rodízio pelo dia — muda a cada dia e é o mesmo o dia todo.
+ * Retorna { challenge, stars, nextTier } ou null se tudo já tem ouro.
+ */
+export function suggestChallenge(bestById = {}, date = new Date()) {
+  const options = CHALLENGE_CATEGORIES.map((cat) => nextChallengeOf(cat.id, bestById)).filter(Boolean)
+  if (!options.length) return null
+  const dayNumber = Math.floor(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / 86400000)
+  const challenge = options[dayNumber % options.length]
+  const stars = bestById[challenge.id]?.stars || 0
+  return { challenge, stars, nextTier: TIER_NAMES[stars] }
+}

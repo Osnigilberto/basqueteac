@@ -42,16 +42,16 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: var(--spacing-sm);
-    width: 100%;
-    padding: var(--spacing-md);
+    gap: var(--spacing-xs);
+    flex-shrink: 0;
+    padding: var(--spacing-sm) var(--spacing-md);
     background: var(--color-primary);
     color: #fff;
     border: none;
     border-radius: var(--radius-lg);
     font-size: var(--font-size-base);
     font-weight: var(--font-weight-semibold);
-    min-height: 48px;
+    min-height: 40px;
     }
 
     .emptyText {
@@ -91,50 +91,6 @@
     margin-bottom: var(--spacing-md);
     }
 
-    .listRow {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--spacing-sm);
-    width: 100%;
-    padding: var(--spacing-sm) 0;
-    background: transparent;
-    border: none;
-    border-top: 1px solid var(--color-border);
-    text-align: left;
-    }
-
-    .listRow:first-of-type {
-    border-top: none;
-    }
-
-    .listRowInfo {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    min-width: 0;
-    }
-
-    .listRowDate {
-    font-size: var(--font-size-xs);
-    font-weight: var(--font-weight-semibold);
-    color: var(--color-text-tertiary);
-    }
-
-    .listRowLocation {
-    font-size: var(--font-size-sm);
-    color: var(--color-text);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    }
-
-    .listRowResult {
-    font-size: var(--font-size-sm);
-    font-weight: var(--font-weight-semibold);
-    color: var(--color-text);
-    }
-
     .listRowArrow {
     color: var(--color-text-tertiary);
     flex-shrink: 0;
@@ -150,4 +106,133 @@
         margin: 0 auto;
         padding: var(--spacing-2xl);
     }
+    }
+    /* ===== TÍTULO + CRIAR ===== */
+    .titleRow {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--spacing-md);
+    }
+
+    /* ===== CARD DE JOGO ===== */
+    .gameCard {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    width: 100%;
+    padding: var(--spacing-sm) 28px var(--spacing-sm) 0;
+    background: transparent;
+    border: none;
+    border-top: 1px solid var(--color-border);
+    text-align: left;
+    cursor: pointer;
+    }
+
+    .gameCard:first-of-type {
+    border-top: none;
+    }
+
+    .gameCard .listRowArrow {
+    position: absolute;
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    }
+
+    .gameMeta {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 4px;
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text-tertiary);
+    }
+
+    .gameLocation {
+    font-weight: var(--font-weight-normal);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 180px;
+    }
+
+    .mineBadge {
+    margin-left: auto;
+    padding: 1px 8px;
+    border-radius: var(--radius-full);
+    font-size: 10px;
+    font-weight: var(--font-weight-bold);
+    color: var(--color-primary);
+    background: color-mix(in srgb, var(--color-primary) 14%, transparent);
+    }
+
+    .gameTeams {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    }
+
+    .teamLine {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--spacing-sm);
+    font-size: var(--font-size-sm);
+    color: var(--color-text);
+    }
+
+    .teamName {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    }
+
+    .teamScore {
+    font-weight: var(--font-weight-bold);
+    font-variant-numeric: tabular-nums;
+    flex-shrink: 0;
+    }
+
+    .teamWinner {
+    font-weight: var(--font-weight-bold);
+    }
+
+    .teamWinner .teamScore {
+    color: var(--color-primary);
+    }
+
+    .teamWinner .teamName::after {
+    content: ' 🏆';
+    }
+
+    .teamDimmed {
+    color: var(--color-text-secondary);
+    }
+
+    .moreButton {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-xs);
+    width: 100%;
+    min-height: 40px;
+    margin-top: var(--spacing-sm);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--color-border);
+    background: transparent;
+    color: var(--color-text);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-semibold);
+    cursor: pointer;
+    }
+
+    .spin {
+    animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+    to { transform: rotate(360deg); }
     }

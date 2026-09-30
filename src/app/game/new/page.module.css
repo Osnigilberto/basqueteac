@@ -1,397 +1,409 @@
-    .page {
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    }
+.page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
 
-    .header {
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-md);
-    padding: var(--spacing-md) var(--spacing-lg);
-    border-bottom: 1px solid var(--color-border);
-    }
+.header {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  padding: var(--spacing-md) var(--spacing-lg);
+  border-bottom: 1px solid var(--color-border);
+}
 
-    .backButton {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 36px;
-    height: 36px;
-    background: var(--color-surface);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
-    color: var(--color-text);
-    }
+.backButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text);
+}
 
-    .logo {
-    font-size: var(--font-size-lg);
-    font-weight: var(--font-weight-extrabold);
-    letter-spacing: -0.01em;
-    color: var(--color-text);
-    }
+.logo {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-extrabold);
+  letter-spacing: -0.01em;
+  color: var(--color-text);
+}
 
-    .logoAccent {
-    color: var(--color-primary);
-    }
+.logoAccent {
+  color: var(--color-primary);
+}
 
-    .content {
-    padding: var(--spacing-lg);
-    width: 100%;
-    }
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  width: 100%;
+  max-width: 640px;
+  margin: 0 auto;
+  padding: var(--spacing-lg) var(--spacing-lg) 120px;
+}
 
-    .title {
-    font-size: var(--font-size-2xl);
-    font-weight: var(--font-weight-extrabold);
-    letter-spacing: -0.02em;
-    color: var(--color-text);
-    margin-bottom: var(--spacing-lg);
-    }
+.title {
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-extrabold);
+  letter-spacing: -0.02em;
+  color: var(--color-text);
+}
 
-    .form {
-    display: flex;
-    flex-direction: column;
-    gap: var(--spacing-lg);
-    max-width: 560px;
-    }
+/* ===== CARTÕES ===== */
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  padding: var(--spacing-lg);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+}
 
-    .row {
-    display: flex;
-    flex-direction: column;
-    gap: var(--spacing-lg);
-    }
+.cardHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: 0.08em;
+  color: var(--color-text-tertiary);
+}
 
-    .field {
-    display: flex;
-    flex-direction: column;
-    gap: var(--spacing-xs);
-    }
+.headerCount {
+  margin-left: auto;
+  letter-spacing: 0;
+  color: var(--color-primary);
+}
 
-    .label {
-    font-size: var(--font-size-sm);
-    font-weight: var(--font-weight-semibold);
-    color: var(--color-text-secondary);
-    }
+.row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--spacing-md);
+}
 
-    .input {
-    padding: var(--spacing-md);
-    background: var(--color-surface);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-lg);
-    color: var(--color-text);
-    min-height: 48px;
-    }
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  min-width: 0;
+}
 
-    .input:focus {
-    outline: none;
-    border-color: var(--color-primary);
-    }
+.label {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-secondary);
+}
 
-    /* ===== LISTA DE JOGADORES ===== */
-    .playersHeader {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    }
+.input {
+  width: 100%;
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  color: var(--color-text);
+  min-height: 46px;
+}
 
-    .teamCounts {
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-xs);
-    font-size: var(--font-size-xs);
-    color: var(--color-text-tertiary);
-    }
+.input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
 
-    .countA {
-    color: var(--color-text);
-    font-weight: var(--font-weight-semibold);
-    }
+.hint {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary);
+}
 
-    .countB {
-    color: var(--color-primary);
-    font-weight: var(--font-weight-semibold);
-    }
+.emptyText {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
 
-    .emptyText {
-    font-size: var(--font-size-sm);
-    color: var(--color-text-secondary);
-    }
+/* ===== CHIPS ===== */
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-xs);
+}
 
-    .playerList {
-    display: flex;
-    flex-direction: column;
-    gap: var(--spacing-sm);
-    }
+.chip {
+  padding: 6px 14px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+}
 
-    .playerRow {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--spacing-sm);
-    padding: var(--spacing-sm) var(--spacing-md);
-    background: var(--color-surface);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-lg);
-    }
+.chipActive {
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+  color: #fff;
+}
 
-    .playerInfo {
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-sm);
-    min-width: 0;
-    }
+.chipInput {
+  width: 76px;
+  padding: 6px 12px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+}
 
-    .playerAvatar {
-    border-radius: 50%;
-    flex-shrink: 0;
-    }
+.chipInput:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
 
-    .playerName {
-    font-size: var(--font-size-sm);
-    font-weight: var(--font-weight-medium);
-    color: var(--color-text);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    }
+.segmented {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  padding: 4px;
+  border-radius: var(--radius-lg);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+}
 
-    .teamToggle {
-    display: flex;
-    gap: var(--spacing-xs);
-    flex-shrink: 0;
-    }
+.segmented button {
+  min-height: 40px;
+  border: none;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+}
 
-    .teamButton {
-    padding: var(--spacing-xs) var(--spacing-sm);
-    background: var(--color-bg);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
-    font-size: var(--font-size-xs);
-    font-weight: var(--font-weight-semibold);
-    color: var(--color-text-tertiary);
-    min-height: 32px;
-    }
+.segmented .segActive {
+  background: var(--color-primary);
+  color: #fff;
+}
 
-    .teamButtonActiveA {
-    background: var(--color-text);
-    border-color: var(--color-text);
-    color: var(--color-bg);
-    }
+/* ===== TIMES ===== */
+.teamsGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--spacing-md);
+}
 
-    .teamButtonActiveB {
-    background: var(--color-primary);
-    border-color: var(--color-primary);
-    color: #fff;
-    }
+.teamBadgeA,
+.teamBadgeB {
+  align-self: flex-start;
+  padding: 2px 10px;
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+}
 
-    .submitButton {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: var(--spacing-sm);
-    padding: var(--spacing-md) var(--spacing-xl);
-    background: var(--color-primary);
-    color: #fff;
-    border: none;
-    border-radius: var(--radius-lg);
-    font-size: var(--font-size-base);
-    font-weight: var(--font-weight-semibold);
-    min-height: 48px;
-    }
+.teamBadgeA {
+  color: var(--color-text);
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+}
 
-    .submitButton:disabled {
-    opacity: 0.5;
-    }
+.teamBadgeB {
+  color: #fff;
+  background: var(--color-primary);
+}
 
-    .spin {
-    animation: spin 1s linear infinite;
-    }
+/* ===== JOGADORES ===== */
+.searchRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-xs);
+}
 
-    @keyframes spin {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
-    }
+.searchBox {
+  flex: 1 1 180px;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: 0 var(--spacing-md);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  color: var(--color-text-tertiary);
+}
 
-    @media (min-width: 600px) {
-    .row {
-        flex-direction: row;
-    }
+.searchBox input {
+  flex: 1;
+  min-width: 0;
+  min-height: 40px;
+  border: none;
+  background: transparent;
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+}
 
-    .row .field {
-        flex: 1;
-    }
-    }
+.searchBox input:focus {
+  outline: none;
+}
 
-    @media (min-width: 768px) {
-    .header {
-        padding: var(--spacing-lg) var(--spacing-2xl);
-    }
+.smallButton {
+  padding: 0 var(--spacing-md);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+}
 
-    .content {
-        max-width: 640px;
-        margin: 0 auto;
-        padding: var(--spacing-2xl);
-    }
-    }
+.playerGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: var(--spacing-xs);
+}
 
-    .targetOptions {
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-xs);
-    flex-wrap: wrap;
-    }
+.playerChip {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  min-width: 0;
+  padding: 6px 10px 6px 6px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  color: var(--color-text);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color var(--transition-fast), background var(--transition-fast);
+}
 
-    .targetButton {
-    padding: var(--spacing-xs) var(--spacing-md);
-    background: var(--color-bg);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
-    font-size: var(--font-size-xs);
-    font-weight: var(--font-weight-semibold);
-    color: var(--color-text-tertiary);
-    min-height: 32px;
-    }
+.playerChipActive {
+  border-color: var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary) 14%, var(--color-bg));
+}
 
-    .targetButtonActive {
-    background: var(--color-primary);
-    border-color: var(--color-primary);
-    color: #fff;
-    }
+.playerAvatar {
+  border-radius: 50%;
+  flex-shrink: 0;
+}
 
-    .targetInput {
-    width: 64px;
-    padding: var(--spacing-xs) var(--spacing-sm);
-    background: var(--color-bg);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
-    font-size: var(--font-size-xs);
-    font-weight: var(--font-weight-semibold);
-    color: var(--color-text);
-    text-align: center;
-    min-height: 32px;
-    }
+.avatarFallback {
+  flex-shrink: 0;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-secondary);
+  background: var(--color-bg-secondary);
+  text-transform: uppercase;
+}
 
-    .targetHint {
-    font-size: var(--font-size-xs);
-    color: var(--color-text-tertiary);
-    margin-top: var(--spacing-xs);
-    }
+.playerName {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
-    .typeToggle {
-    display: flex;
-    gap: var(--spacing-sm);
-    }
+.playerCheck {
+  flex-shrink: 0;
+  color: var(--color-primary);
+}
 
-    .typeButton {
-    flex: 1;
-    padding: var(--spacing-md);
-    background: var(--color-surface);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-lg);
-    font-size: var(--font-size-sm);
-    font-weight: var(--font-weight-semibold);
-    color: var(--color-text-secondary);
-    min-height: 48px;
-    }
+/* ===== 1×1 ===== */
+.duelGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--spacing-md);
+}
 
-    .typeButtonActive {
-    background: var(--color-primary);
-    border-color: var(--color-primary);
-    color: #fff;
-    }
+.duelList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  max-height: 320px;
+  overflow-y: auto;
+}
 
-    .rosterRow {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--spacing-sm);
-    width: 100%;
-    padding: var(--spacing-sm) var(--spacing-md);
-    background: var(--color-surface);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-lg);
-    margin-bottom: var(--spacing-sm);
-    }
+/* ===== BARRA FIXA DE ENVIO ===== */
+.submitBar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  padding: var(--spacing-md) max(var(--spacing-lg), calc((100% - 640px) / 2 + var(--spacing-lg)))
+    max(env(safe-area-inset-bottom), var(--spacing-md));
+  background: color-mix(in srgb, var(--color-surface) 94%, transparent);
+  backdrop-filter: blur(10px);
+  border-top: 1px solid var(--color-border);
+}
 
-    .rosterRowActive {
-    border-color: var(--color-primary);
-    background: var(--color-bg-secondary);
-    }
+.submitSummary {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  line-height: 1.3;
+  color: var(--color-text);
+}
 
-    .rosterCheck {
-    font-size: var(--font-size-base);
-    font-weight: var(--font-weight-bold);
-    color: var(--color-primary);
-    width: 20px;
-    text-align: center;
-    flex-shrink: 0;
-    }
+.submitMissing {
+  color: var(--color-text-tertiary);
+  font-weight: var(--font-weight-normal);
+}
 
-    .teamsGrid {
-    display: grid;
+.submitButton {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  min-height: 46px;
+  padding: 0 var(--spacing-lg);
+  border: none;
+  border-radius: var(--radius-lg);
+  background: var(--color-primary);
+  color: #fff;
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-bold);
+  cursor: pointer;
+}
+
+.submitButton:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 420px) {
+  .row,
+  .teamsGrid,
+  .duelGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .playerGrid {
     grid-template-columns: 1fr 1fr;
-    gap: var(--spacing-sm);
-    }
-
-    @media (max-width: 480px) {
-    .teamsGrid {
-        grid-template-columns: 1fr;
-    }
-    }
-
-    .teamInputGroup {
-    display: flex;
-    flex-direction: column;
-    gap: var(--spacing-xs);
-    }
-
-    .teamBadgeA,
-    .teamBadgeB {
-    display: inline-block;
-    font-size: var(--font-size-xs);
-    font-weight: var(--font-weight-bold);
-    padding: 2px 8px;
-    border-radius: var(--radius-sm);
-    width: fit-content;
-    }
-
-    .teamBadgeA {
-    background: var(--color-surface);
-    border: 1px solid var(--color-border);
-    color: var(--color-text);
-    }
-
-    .teamBadgeB {
-    background: var(--color-primary);
-    color: #fff;
-    }
-
-    .presetRow {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--spacing-xs);
-    margin-top: var(--spacing-xs);
-    }
-
-    .presetLabel {
-    font-size: var(--font-size-xs);
-    color: var(--color-text-tertiary);
-    }
-
-    .presetChip {
-    padding: 4px var(--spacing-sm);
-    background: var(--color-surface);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-full);
-    font-size: var(--font-size-xs);
-    font-weight: var(--font-weight-medium);
-    color: var(--color-text-secondary);
-    cursor: pointer;
-    transition: all 0.15s ease;
-    }
-
-    .presetChip:hover {
-    border-color: var(--color-primary);
-    color: var(--color-primary);
-    }
+  }
+}

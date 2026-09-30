@@ -1,69 +1,12 @@
-    import { collection, collectionGroup, doc, getDoc, getDocs, query, where } from 'firebase/firestore'
-    import { db } from '@/lib/firebase'
+    import { fetchGroupData, playerGameLog, headToHeadWins } from '@/lib/gameStats'
 
-    // Busca todo o histórico de jogos finalizados de um jogador, já enriquecido
-    // com vitória/derrota e se foi MVP daquele jogo específico — base pra
-    // calcular qualquer conquista sem precisar buscar de novo a cada uma
+    // Histórico de jogos finalizados de um jogador, já enriquecido com
+    // vitória/derrota e se foi MVP daquele jogo — base pra calcular qualquer
+    // conquista. Usa os dados do grupo em cache (mesmos do Início e Stats).
     export async function fetchPlayerAchievementData(uid) {
-    const statsQuery = query(collectionGroup(db, 'stats'), where('uid', '==', uid))
-    const snap = await getDocs(statsQuery)
-
-    const gameEntries = []
-    const h2hTally = {} // uid do adversário -> número de vitórias contra ele
-
-    await Promise.all(
-        snap.docs.map(async (statDoc) => {
-        try {
-            const gameRef = statDoc.ref.parent.parent
-            const gameSnap = await getDoc(gameRef)
-            if (!gameSnap.exists() || gameSnap.data().status !== 'finished') return
-
-            const game = gameSnap.data()
-            const data = statDoc.data()
-            const isTeamA = data.team === 'A'
-            const ownTeam = isTeamA ? game.teamA : game.teamB
-            const oppTeam = isTeamA ? game.teamB : game.teamA
-            const won = ownTeam.score > oppTeam.score
-
-            // MVP daquele jogo específico — precisa olhar os stats de TODOS
-            // os jogadores daquele jogo, não só os do uid pesquisado
-            const allStatsSnap = await getDocs(collection(db, 'games', gameRef.id, 'stats'))
-            const totalsByPlayer = allStatsSnap.docs.map((d) => {
-            const s = d.data()
-            return {
-                uid: s.uid,
-                total: (s.points || 0) + (s.rebounds || 0) + (s.assists || 0) + (s.blocks || 0) + (s.steals || 0),
-            }
-            })
-            const maxTotal = Math.max(0, ...totalsByPlayer.map((t) => t.total))
-            const isMvp = maxTotal > 0 && totalsByPlayer.some((t) => t.uid === uid && t.total === maxTotal)
-
-            if (won) {
-            oppTeam.players.forEach((oppUid) => {
-                h2hTally[oppUid] = (h2hTally[oppUid] || 0) + 1
-            })
-            }
-
-            gameEntries.push({
-            gameId: gameRef.id,
-            date: game.date,
-            points: data.points || 0,
-            rebounds: data.rebounds || 0,
-            assists: data.assists || 0,
-            blocks: data.blocks || 0,
-            steals: data.steals || 0,
-            threePointers: data.threePointers || 0,
-            won,
-            isMvp,
-            })
-        } catch (error) {
-            console.error('[fetchPlayerAchievementData → jogo]', error)
-        }
-        })
-    )
-
-    gameEntries.sort((a, b) => a.date.toMillis() - b.date.toMillis())
-    return { gameEntries, h2hTally }
+    const { games } = await fetchGroupData()
+    const gameEntries = playerGameLog(games, uid).sort((a, b) => a.date.toMillis() - b.date.toMillis())
+    return { gameEntries, h2hTally: headToHeadWins(games, uid) }
     }
 
     // Conta quantas categorias bateram 10+ num jogo — base do double/triple/
