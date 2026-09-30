@@ -12,6 +12,8 @@ import {
   writeBatch,
   increment,
   serverTimestamp,
+  arrayRemove,
+  arrayUnion,
 } from 'firebase/firestore'
 import {
   ArrowLeft,
@@ -32,6 +34,8 @@ import {
   Pause,
   Dices,
   Flag,
+  Trash2,
+  ArrowLeftRight,
 } from 'lucide-react'
 import { db } from '@/lib/firebase'
 import { useAuth } from '@/hooks/useAuth'
@@ -74,6 +78,9 @@ export default function GamePage() {
   const [undoing, setUndoing] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
   const [confirmFinish, setConfirmFinish] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [movingUid, setMovingUid] = useState(null)
   const [showDurations, setShowDurations] = useState(false)
   const [balanceByPpg, setBalanceByPpg] = useState(true)
   const [drawing, setDrawing] = useState(false)
@@ -304,6 +311,49 @@ export default function GamePage() {
       setEditingTeams(false)
     } catch (err) {
       console.error('[handleSaveTeams]', err)
+    }
+  }
+
+  // Troca um jogador de time (antes ou durante o jogo). Os pontos que ele já
+  // marcou continuam no placar do time antigo — o placar do time é separado.
+  async function movePlayer(uid) {
+    const stat = stats.find((s) => s.uid === uid)
+    if (!stat || movingUid) return
+    const from = stat.team
+    const to = from === 'A' ? 'B' : 'A'
+    setMovingUid(uid)
+    try {
+      const batch = writeBatch(db)
+      batch.update(doc(db, 'games', gameId), {
+        [`team${from}.players`]: arrayRemove(uid),
+        [`team${to}.players`]: arrayUnion(uid),
+        updatedAt: serverTimestamp(),
+      })
+      batch.update(doc(db, 'games', gameId, 'stats', uid), { team: to })
+      await batch.commit()
+    } catch (error) {
+      console.error('[movePlayer]', error)
+      alert('Não foi possível trocar o jogador de time.')
+    } finally {
+      setMovingUid(null)
+    }
+  }
+
+  // Exclui um jogo que ainda não começou (as regras só permitem a quem criou)
+  async function deleteGame() {
+    setDeleting(true)
+    try {
+      const batch = writeBatch(db)
+      stats.forEach((s) => batch.delete(doc(db, 'games', gameId, 'stats', s.uid)))
+      batch.delete(doc(db, 'games', gameId))
+      await batch.commit()
+      invalidateGroupData()
+      router.push('/game')
+    } catch (error) {
+      console.error('[deleteGame]', error)
+      alert('Não foi possível excluir o jogo. Só quem criou o jogo pode excluí-lo.')
+      setDeleting(false)
+      setConfirmDelete(false)
     }
   }
 
@@ -655,6 +705,45 @@ export default function GamePage() {
                     </div>
                   )}
                 </div>
+
+                {/* Trocar de time (jogo Time x Time com times já montados, antes de encerrar) */}
+                {game.gameType !== '1v1' && !needsTeamSetup && !isFinished && (
+                  <div className={styles.moveSection}>
+                    <span className={styles.moveTitle}>
+                      <ArrowLeftRight size={14} /> Trocar jogador de time
+                    </span>
+                    {isLive && (
+                      <span className={styles.moveHint}>Os pontos já marcados continuam no placar do time antigo.</span>
+                    )}
+                    <div className={styles.moveList}>
+                      {['A', 'B'].map((team) =>
+                        getTeamRows(team).map((row) => (
+                          <button
+                            key={row.uid}
+                            type="button"
+                            className={`${styles.moveRow} ${team === 'B' ? styles.moveRowB : ''}`}
+                            onClick={() => movePlayer(row.uid)}
+                            disabled={!!movingUid}
+                          >
+                            <span className={styles.playerName}>{displayName(row.player)}</span>
+                            <span className={styles.moveArrow}>
+                              {movingUid === row.uid
+                                ? 'Trocando...'
+                                : `→ ${team === 'A' ? game.teamB.name : game.teamA.name}`}
+                            </span>
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Excluir: só antes de começar e só para quem criou */}
+                {isScheduled && game.createdBy === user.uid && (
+                  <button type="button" className={styles.deleteButton} onClick={() => setConfirmDelete(true)}>
+                    <Trash2 size={14} /> Excluir jogo
+                  </button>
+                )}
               </div>
             )}
           </section>
@@ -910,11 +999,54 @@ export default function GamePage() {
               ))}
             </div>
 
-            {lastAction && (
-              <button type="button" className={styles.drawerUndo} onClick={undoLastAction} disabled={undoing}>
-                <Undo2 size={14} /> Desfazer: {describeAction(lastAction)} {nameOf(lastAction.uid)}
+            <div className={styles.drawerFooter}>
+              {lastAction && (
+                <button type="button" className={styles.drawerUndo} onClick={undoLastAction} disabled={undoing}>
+                  <Undo2 size={14} /> Desfazer: {describeAction(lastAction)} {nameOf(lastAction.uid)}
+                </button>
+              )}
+              {game.gameType !== '1v1' && (
+                <button
+                  type="button"
+                  className={styles.drawerUndo}
+                  onClick={() => movePlayer(selectedUid)}
+                  disabled={!!movingUid}
+                >
+                  <ArrowLeftRight size={14} />
+                  {movingUid === selectedUid
+                    ? 'Trocando...'
+                    : `Trocar para ${selectedStat.team === 'A' ? game.teamB.name : game.teamA.name}`}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CONFIRMAR EXCLUSÃO */}
+      {confirmDelete && (
+        <div className={styles.drawerOverlay} onClick={() => !deleting && setConfirmDelete(false)}>
+          <div className={styles.confirmDialog} onClick={(e) => e.stopPropagation()} role="alertdialog">
+            <h3>Excluir este jogo?</h3>
+            <p>
+              {game.teamA.name} × {game.teamB.name}
+            </p>
+            <span className={styles.confirmHint}>
+              {formatGameDate(game.date)}. O jogo some da lista para todo mundo e não dá para desfazer.
+            </span>
+            <div className={styles.confirmActions}>
+              <button
+                type="button"
+                className={styles.confirmCancel}
+                onClick={() => setConfirmDelete(false)}
+                disabled={deleting}
+              >
+                Cancelar
               </button>
-            )}
+              <button type="button" className={styles.confirmFinish} onClick={deleteGame} disabled={deleting}>
+                {deleting ? 'Excluindo...' : 'Excluir'}
+              </button>
+            </div>
           </div>
         </div>
       )}
