@@ -1505,3 +1505,18 @@
     justify-content: center;
     gap: var(--spacing-xs);
     }
+
+    /* ===== TROCOU DE TIME ===== */
+    .switchedTag {
+    margin-left: 4px;
+    flex-shrink: 0;
+    font-size: 12px;
+    font-weight: var(--font-weight-bold);
+    color: var(--color-text-tertiary);
+    }
+
+    .switchedNote {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-tertiary);
+    text-align: center;
+    }

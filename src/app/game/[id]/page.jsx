@@ -329,7 +329,7 @@ export default function GamePage() {
         [`team${to}.players`]: arrayUnion(uid),
         updatedAt: serverTimestamp(),
       })
-      batch.update(doc(db, 'games', gameId, 'stats', uid), { team: to })
+      batch.update(doc(db, 'games', gameId, 'stats', uid), { team: to, switchedTeams: true })
       await batch.commit()
     } catch (error) {
       console.error('[movePlayer]', error)
@@ -885,6 +885,7 @@ export default function GamePage() {
             {isLive && user && <p className={styles.tapHint}>Toque num jogador para marcar pontos e estatísticas.</p>}
             <TeamSection
               title={game.teamA.name}
+              score={game.teamA.score}
               rows={getTeamRows('A')}
               editable={isLive && !!user}
               onSelect={setSelectedUid}
@@ -893,6 +894,7 @@ export default function GamePage() {
             />
             <TeamSection
               title={game.teamB.name}
+              score={game.teamB.score}
               rows={getTeamRows('B')}
               editable={isLive && !!user}
               onSelect={setSelectedUid}
@@ -901,6 +903,13 @@ export default function GamePage() {
               styles={styles}
             />
           </>
+        )}
+
+        {!needsTeamSetup && stats.some((st) => st.switchedTeams) && (
+          <p className={styles.switchedNote}>
+            ⇄ trocou de time durante o jogo — os pontos dele contam no placar de cada time em que foram feitos; o
+            total de pontos mostra o placar oficial.
+          </p>
         )}
 
         {isLive && user && (
@@ -1096,7 +1105,7 @@ function SetupChip({ player, team, onClick, styles }) {
 }
 
 
-function TeamSection({ title, rows, editable, onSelect, accent, mvpUids = [], styles }) {
+function TeamSection({ title, score, rows, editable, onSelect, accent, mvpUids = [], styles }) {
   const total = (key) => rows.reduce((acc, r) => acc + (r[key] || 0), 0)
   return (
     <section className={styles.teamSection}>
@@ -1134,6 +1143,15 @@ function TeamSection({ title, rows, editable, onSelect, accent, mvpUids = [], st
               <span className={styles.playerName}>
                 {row.player.nickname || row.player.name || 'Jogador'}
               </span>
+              {row.switchedTeams && (
+                <span
+                  className={styles.switchedTag}
+                  title="Trocou de time durante o jogo: parte dos pontos está no placar do outro time"
+                  aria-label="Trocou de time"
+                >
+                  ⇄
+                </span>
+              )}
               {mvpUids.includes(row.uid) && (
                 <span className={styles.mvpTag} title="MVP da partida" aria-label="MVP da partida">
                   ★
@@ -1152,7 +1170,7 @@ function TeamSection({ title, rows, editable, onSelect, accent, mvpUids = [], st
       {rows.length > 1 && (
         <div className={styles.totalRow}>
           <span className={styles.statsHeaderName}>Total</span>
-          <span className={styles.statValuePrimary}>{total('points')}</span>
+          <span className={styles.statValuePrimary} title="Placar oficial do time">{score ?? total('points')}</span>
           <span>{total('rebounds')}</span>
           <span>{total('assists')}</span>
           <span>{total('blocks')}</span>
